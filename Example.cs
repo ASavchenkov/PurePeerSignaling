@@ -1,15 +1,20 @@
 using Godot;
 using System;
 
-public class Menu : Control
+public class Example : Spatial
 {
-
-    public WebRTCPeer rtcSingleton;
+   
     // Called when the node enters the scene tree for the first time.
     public override void _Ready()
     {
-        rtcSingleton = (WebRTCPeer) GetNode("/root/WebRTCPeer");
-        GetNode("Buttons/ClearMesh").Connect("pressed",rtcSingleton,"_OnClearMesh");        
+        
+    }
+
+    public void _JoinMesh()
+    {
+        Networking networking = (Networking) GetNode("Networking");
+        string url = ((TextEdit) GetNode("UI/TextEdit")).Text;
+        networking._JoinMesh(url);
     }
 
 //  // Called every frame. 'delta' is the elapsed time since the previous frame.

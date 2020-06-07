@@ -63,7 +63,7 @@ public class Networking : Node
         GetTree().NetworkPeer = RTCMP;
     }
     
-    public void _JoinMesh()
+    public void _JoinMesh(string url)
     {
         GD.Print("_JoinMesh");
         //first you need to remove yourself from the current mesh.
@@ -75,6 +75,15 @@ public class Networking : Node
         handshakeClient.Handshake(textBox.Text);
     }
 
+    public void _StartServer()
+    {
+        handshakeServer._StartServer();
+    }
+    public void _StopServer()
+    {
+        handshakeServer._StopServer();
+    }
+    
     public Godot.Collections.Array intToGArr(int input)
     {
         return new Godot.Collections.Array(new int[] {input});
