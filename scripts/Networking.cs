@@ -30,10 +30,20 @@ public class Networking : Node
     public HandshakeServer handshakeServer;
     public HandshakeClient handshakeClient;
 
+    private struct Relay
+    {
+        public int uid;
+        public bool askForPeers;
+        public Relay(int _uid, bool _askForPeers)
+        {
+            uid = _uid;
+            askForPeers = _askForPeers;
+        }
+    }
 
     //The list of peers we have yet to send offers to.
     //maps the uid of the peer to the uid of the relay peer.
-    public Dictionary<int,int> peerRelays = new Dictionary<int,int>();
+    private Dictionary<int,Relay> peerRelays = new Dictionary<int,Relay>();
 
 
     // Called when the node enters the scene tree for the first time.
@@ -90,31 +100,40 @@ public class Networking : Node
     public void _OfferCreated(String type, String sdp, int uid)
     {
         var peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
-        peer.SetLocalDescription(type, sdp);
+        GD.Print(peer.SetLocalDescription(type, sdp));
         
-        this.RpcId(peerRelays[uid],"RelayOffer", RTCMP.GetUniqueId(), uid, type, sdp);
+        this.RpcId(peerRelays[uid].uid,"RelayOffer",  uid, RTCMP.GetUniqueId(), type, sdp);
         
         GD.Print("NETWORKING OFFER CREATED");
     }
 
     [Remote]
-    public void RelayOffer(int senderUID, int uid, string type, string sdp)
+    public void RelayOffer(int uid, int senderUID, string type, string sdp)
     {
         this.RpcId(uid, "ReceiveOffer", senderUID ,type, sdp);
     }
 
-    //this only ever happens as a response to a peer relaying an offer to us
+    
     [Remote]
     public void ReceiveOffer(int uid, string type, string sdp)
     {
-        GD.Print("RECEIVE OFFER");
-        var peer = this.AddPeer(this, uid);
-        peer.SetRemoteDescription(type, sdp);
+        GD.Print("RECEIVE OFFER: ", type);
 
-        //we make sure to use the same peer to send packets back for now
-        //since it's the only one we know is connected to that peer for sure.
+        //if this is the case, we don't yet have them as a peer.
+        WebRTCPeerConnection peer;
         if(type == "offer")
-            peerRelays.Add(uid, GetTree().GetRpcSenderId());
+        {
+            peer = this.AddPeer(this, uid);
+
+            //we make sure to use the same peer to send packets back for now
+            //since it's the only one we know is connected to that peer for sure.
+            peerRelays.Add(uid, new Relay(GetTree().GetRpcSenderId(),false));
+        }else{
+            //It's an answer, so we should already have a peer in the system.
+            peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
+        }
+        
+        GD.Print(peer.SetRemoteDescription(type, sdp));
     }
 
     [Remote]
@@ -134,7 +153,7 @@ public class Networking : Node
         //because peers only get added to peerRelays when ["connected"] is true.
         else if (peerRelays.ContainsKey(uid))
         {
-            this.RpcId(peerRelays[uid],"RelayIceCandidate", RTCMP.GetUniqueId(), media, index, name, uid);
+            this.RpcId(peerRelays[uid].uid,"RelayIceCandidate", RTCMP.GetUniqueId(), media, index, name, uid);
         }
         GD.Print("NETWORKING ICE CANDIDATE CREATED");
     }
@@ -163,10 +182,11 @@ public class Networking : Node
             //add them if we don't already have them.
             if (!RTCMP.HasPeer(uid) && !(uid == RTCMP.GetUniqueId()))
             {
+                GD.Print("ADDING THIS PEER: ", uid);
                 WebRTCPeerConnection newPeer = this.AddPeer(this, uid);
                 //Immediately create the offer since we're the ones offering.
                 newPeer.CreateOffer();
-                peerRelays.Add(uid,referrer);
+                peerRelays.Add(uid, new Relay(referrer,true));
             }
         }
     }
@@ -175,7 +195,10 @@ public class Networking : Node
     public void GetPeerUIDs()
     {
         int requester = GetTree().GetRpcSenderId();
-
+        
+        GD.Print("Getting peers for: ", requester);
+        GD.Print(RTCMP.GetPeers().Keys);
+        
         //maybe there's a way to cast non-generic collections
         //to generic collections?
         //For now this will have to do.
@@ -215,7 +238,10 @@ public class Networking : Node
             if ( (bool)RTCMP.GetPeer(uid)["connected"])
             {
                 //if they are, then ask them for their peers
-                this.RpcId(uid,"GetPeerUIDs");
+                if(peerRelays[uid].askForPeers)
+                    this.RpcId(uid,"GetPeerUIDs");
+                    
+                //then remove them from the list.
                 toRemove.Add(uid);
             }
         }
