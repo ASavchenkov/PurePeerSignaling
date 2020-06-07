@@ -21,4 +21,4 @@ config/icon="res://icon.png"
 
 [gdnative]
 
-singletons=[  ]
+singletons=[ "res://webrtc_debug/webrtc_debug.tres" ]
