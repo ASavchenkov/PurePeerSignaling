@@ -71,12 +71,22 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="TextEdit" type="TextEdit" parent="UI"]
+[node name="URL" type="TextEdit" parent="UI"]
 margin_left = 287.684
 margin_top = 313.333
 margin_right = 656.684
 margin_bottom = 343.333
 text = "ws://192.168.1.143:3476"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Secret" type="TextEdit" parent="UI"]
+margin_left = 290.0
+margin_top = 352.0
+margin_right = 658.0
+margin_bottom = 385.0
+text = "secret"
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -92,6 +102,6 @@ __meta__ = {
 
 [node name="Networking" parent="." instance=ExtResource( 1 )]
 [connection signal="pressed" from="UI/Buttons/JoinMesh" to="." method="_JoinMesh"]
-[connection signal="pressed" from="UI/Buttons/StartServer" to="Networking" method="_StartServer"]
+[connection signal="pressed" from="UI/Buttons/StartServer" to="." method="_StartServer"]
 [connection signal="pressed" from="UI/Buttons/DispPeers" to="Networking" method="_DispPeers"]
 [connection signal="pressed" from="UI/Buttons/StopServer" to="Networking" method="_StopServer"]

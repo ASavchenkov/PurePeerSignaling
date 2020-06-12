@@ -37,7 +37,7 @@ public class HandshakeServer : Node
 
     public const int TIMEOUT = 2000;
     public const int PORT = 3476;
-    public const String secret = "secret"; //in practice, this is set by the user.
+    public string secret; //in practice, this is set by the user.
     public WebSocketServer server = new WebSocketServer();
     
     private Dictionary<int, WSPeer> WSPeers = new Dictionary<int, WSPeer>();
@@ -58,12 +58,13 @@ public class HandshakeServer : Node
 
     }
 
-    public void _StartServer()
+    public void _StartServer(string _secret)
     {
         server.Listen(PORT);
         
         WSPeers = new Dictionary<int, WSPeer>();
         WSIDMap = new Dictionary<int, int>();
+        secret = _secret;
         SetProcess(true);
     }
 

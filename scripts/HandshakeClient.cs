@@ -18,7 +18,7 @@ public class HandshakeClient : Node
     public WebSocketClient WSClient = new WebSocketClient();
     private WebRTCPeerConnection handshakePeer;
     private int handshakeCounterpart = -1;
-    
+    private string secret;
 
     public override void _Ready()
     {
@@ -31,11 +31,12 @@ public class HandshakeClient : Node
     {
         GD.Print("_ConnectionClosed");
     }
-    public Error Handshake(string serverLink)
+    public Error Handshake(string serverLink, string _secret)
     {
         GD.Print("Handshake");
         SetProcess(true);
         handshakeCounterpart = -1;
+        secret = _secret;
         
         return WSClient.ConnectToUrl(serverLink);
     }
@@ -49,7 +50,7 @@ public class HandshakeClient : Node
         
         var authDict = new Dictionary<string, dynamic>();
         authDict["type"]= "authentication";
-        authDict["secret"] = "secret";
+        authDict["secret"] = secret;
 
         byte[] authPayload = MessagePackSerializer.Serialize(authDict);
         
