@@ -51,12 +51,12 @@
       <HintPath>$(ProjectDir)/.mono/assemblies/$(ApiConfiguration)/GodotSharpEditor.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.CSharp" />  <!-- COPY THIS TO YOUR CSPROJ -->
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="MessagePack">
-      <Version>2.1.115</Version>
-    </PackageReference>
+  <ItemGroup> 
+    <PackageReference Include="MessagePack">  <!-- COPY THIS TO YOUR CSPROJ -->
+      <Version>2.1.115</Version>              <!-- COPY THIS TO YOUR CSPROJ -->
+    </PackageReference>                       <!-- COPY THIS TO YOUR CSPROJ -->
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Example.cs" />
