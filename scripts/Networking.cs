@@ -30,6 +30,9 @@ public class Networking : Node
 	public HandshakeServer handshakeServer;
 	public HandshakeClient handshakeClient;
 
+	public string url = "ws://192.168.1.143:3476";
+	public string secret = "secret";
+
 	private struct Relay
 	{
 		public int uid;
@@ -63,7 +66,16 @@ public class Networking : Node
 		GetTree().NetworkPeer = RTCMP;
 	}
 	
-	public void _JoinMesh(string url, string secret)
+	public void _SetURL(string url)
+	{
+		this.url = url;
+	}
+
+	public void _SetSecret(string secret)
+	{
+		this.secret = secret;
+	}
+	public void _JoinMesh()
 	{
 		GD.Print("_JoinMesh");
 		//first you need to remove yourself from the current mesh.
@@ -75,7 +87,7 @@ public class Networking : Node
 		handshakeClient.Handshake(url, secret);
 	}
 
-	public void _StartServer(string secret)
+	public void _StartServer()
 	{
 		handshakeServer._StartServer(secret);
 	}
