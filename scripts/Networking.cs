@@ -238,17 +238,6 @@ public class Networking : Node
 		this.RpcId(handshakeCounterpart,"GetPeerUIDs");
 	}
 
-	public void _DispPeers()
-	{
-		string peerString = "";
-		foreach(int uid in RTCMP.GetPeers().Keys)
-		{
-			peerString += uid.ToString() + ": " + ((bool) RTCMP.GetPeer(uid)["connected"]).ToString() + "\n";
-		}
-		RichTextLabel display = (RichTextLabel) GetNode("../UI/PeerList");
-		display.Text  = peerString;
-	}
-
 	public override void _Process(float delta)
 	{
 		//For each peer in our dictionary mapping peers to relays
@@ -270,9 +259,6 @@ public class Networking : Node
 		//and remove them from the dictionary.
 		foreach( int uid in toRemove)
 			peerRelays.Remove(uid);
-
-		
-		_DispPeers();
 	}
 
 }

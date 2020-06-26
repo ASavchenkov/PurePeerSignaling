@@ -103,7 +103,7 @@ __meta__ = {
 [node name="Networking" parent="." instance=ExtResource( 1 )]
 [connection signal="pressed" from="UI/Buttons/JoinMesh" to="Networking" method="_JoinMesh"]
 [connection signal="pressed" from="UI/Buttons/StartServer" to="Networking" method="_StartServer"]
-[connection signal="pressed" from="UI/Buttons/DispPeers" to="Networking" method="_DispPeers"]
+[connection signal="pressed" from="UI/Buttons/DispPeers" to="." method="_DispPeers"]
 [connection signal="pressed" from="UI/Buttons/StopServer" to="Networking" method="_StopServer"]
 [connection signal="text_changed" from="UI/hostURL" to="Networking" method="_SetURL"]
 [connection signal="text_changed" from="UI/secret" to="Networking" method="_SetSecret"]
