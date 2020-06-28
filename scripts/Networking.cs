@@ -21,6 +21,9 @@ Overall mode of operation:
 public class Networking : Node
 {
 
+	[Signal]
+	public delegate void UIDChanged(int uid);
+
 	//used to initialize every peer with some stun servers.
 	public Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
 	
@@ -108,8 +111,10 @@ public class Networking : Node
 		peer.Initialize(RTCInitializer);
 		peer.Connect("session_description_created", signalReceiver, "_OfferCreated",intToGArr(peerID));
 		peer.Connect("ice_candidate_created", signalReceiver, "_IceCandidateCreated",intToGArr(peerID));
-		
+
 		RTCMP.AddPeer(peer, peerID);
+		//now emit a signal so the game knows a new peer just joined.
+		
 		return peer;
 	}
 
@@ -250,7 +255,7 @@ public class Networking : Node
 				//if they are, then ask them for their peers
 				if(peerRelays[uid].askForPeers)
 					this.RpcId(uid,"GetPeerUIDs");
-					
+	
 				//then remove them from the list.
 				toRemove.Add(uid);
 			}

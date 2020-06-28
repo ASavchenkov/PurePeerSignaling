@@ -91,7 +91,9 @@ public class HandshakeClient : Node
                 //we need to cast deserialized integers
                 //because this seems to serialize to uint32 by default.
                 //This will not be an issue when we move away from dynamics.
-                networking.RTCMP.Initialize( (int) data["assignedUID"],false);
+                int assignedUID = (int) data["assignedUID"];
+                networking.RTCMP.Initialize( assignedUID,false);
+                networking.EmitSignal("UIDChanged", assignedUID);
                 GetTree().NetworkPeer = networking.RTCMP;
                 //Now we can call RPCs on peers when we get some.
 
