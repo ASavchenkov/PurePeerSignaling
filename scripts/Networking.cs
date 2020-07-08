@@ -22,7 +22,7 @@ public class Networking : Node
 {
 
 	[Signal]
-	public delegate void UIDChanged(int uid);
+	public delegate void ConnectedToSession(int uid);
 
 	//used to initialize every peer with some stun servers.
 	public Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();

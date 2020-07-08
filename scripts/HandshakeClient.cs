@@ -93,7 +93,7 @@ public class HandshakeClient : Node
                 //This will not be an issue when we move away from dynamics.
                 int assignedUID = (int) data["assignedUID"];
                 networking.RTCMP.Initialize( assignedUID,false);
-                networking.EmitSignal("UIDChanged", assignedUID);
+                networking.EmitSignal("ConnectedToSession", assignedUID);
                 GetTree().NetworkPeer = networking.RTCMP;
                 //Now we can call RPCs on peers when we get some.
 
