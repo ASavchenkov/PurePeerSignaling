@@ -25,16 +25,20 @@ public class Networking : Node
 	public delegate void ConnectedToSession(int uid);
 
 	//used to initialize every peer with some stun servers.
-	public Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
+	Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
 	
 	public WebRTCMultiplayer RTCMP = new WebRTCMultiplayer();
 
 	
-	public HandshakeServer handshakeServer;
-	public HandshakeClient handshakeClient;
+	HandshakeServer handshakeServer;
+	HandshakeClient handshakeClient;
 
-	public string url = "ws://192.168.1.143:3476";
-	public string secret = "secret";
+	string url = "ws://192.168.1.143:3476";
+	string secret = "secret";
+
+	Dictionary<int, DateTime> connectivityTracker = new Dictionary<int, DateTime>();
+	TimeSpan TIMEOUT = new TimeSpan(0,0,3);
+	System.Timers.Timer connectivityTimer = new System.Timers.Timer(1000);
 
 	private struct Relay
 	{
@@ -67,6 +71,12 @@ public class Networking : Node
 		
 		RTCMP.Initialize(1,false);
 		GetTree().NetworkPeer = RTCMP;
+
+		GetTree().Connect("network_peer_connected", this, "OnPeerConnected");
+		connectivityTimer.Elapsed += this.CheckTimeout;
+		connectivityTimer.AutoReset = true;
+		connectivityTimer.Start();
+
 	}
 	
 	public void _SetURL(string url)
@@ -237,14 +247,55 @@ public class Networking : Node
 		this.RpcId(requester,"AddPeers", packet);
 	}
 
+
+
 	//handshakeCounterpart is our first point of contact.
 	public void StartPeerSearch(int handshakeCounterpart)
 	{
 		this.RpcId(handshakeCounterpart,"GetPeerUIDs");
 	}
 
+	//PING AND TIMEOUT FUNCTIONALITY
+
+	public void OnPeerConnected(int uid)
+	{
+		connectivityTracker.Add(uid, DateTime.Now);
+	}
+
+	public void CheckTimeout(object source, System.Timers.ElapsedEventArgs e)
+	{
+		//First ping everyone else, since this might as well happen 1 time a second too.
+		Rpc("Ping");
+
+		//For peers that previously connected to us, we check their status
+		ArrayList toClose = new ArrayList();
+		DateTime cutoff = DateTime.Now.Subtract(TIMEOUT);
+		foreach(KeyValuePair<int, DateTime> kvp in connectivityTracker)
+		{
+			if(kvp.Value < cutoff)
+				toClose.Add(kvp.Key);
+		}
+
+		//If they've been disconnected for to long, we close the connection.
+		foreach(int uid in toClose)
+		{
+			GD.Print("removing due to timeout: ", uid);
+			var peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
+			peer.Close();
+			RTCMP.RemovePeer(uid);
+			connectivityTracker.Remove(uid);
+		}
+	}
+	[Remote]
+	public void Ping()
+	{
+		GD.Print("Got Ping");
+		connectivityTracker[GetTree().GetRpcSenderId()] = System.DateTime.Now;
+	}
+
 	public override void _Process(float delta)
 	{
+
 		//For each peer in our dictionary mapping peers to relays
 		ArrayList toRemove = new ArrayList();
 		foreach( int uid in peerRelays.Keys)
@@ -258,6 +309,7 @@ public class Networking : Node
 	
 				//then remove them from the list.
 				toRemove.Add(uid);
+
 			}
 		}
 		
