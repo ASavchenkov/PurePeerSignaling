@@ -16,7 +16,7 @@ public class HandshakeClient : Node
     
     private Networking networking;
     public WebSocketClient WSClient = new WebSocketClient();
-    private WebRTCPeerConnection handshakePeer;
+    private BufferedWebRTCPeerConnection handshakePeer;
     private int handshakeCounterpart = -1;
     private string secret;
 
@@ -135,7 +135,7 @@ public class HandshakeClient : Node
         WSClient.GetPeer(1).PutPacket(payload);
     }
 
-    //when the WebRTCPeerConnection is CONNECTED, we hand off communication to it.
+    //when the BufferedWebRTCPeerConnection is CONNECTED, we hand off communication to it.
     private void _FinishHandshake()
     {
         GD.Print("_FinishHandshake");
