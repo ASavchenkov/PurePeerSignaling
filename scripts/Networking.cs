@@ -54,18 +54,21 @@ public class Networking : Node
 	//maps the uid of the peer to the uid of the relay peer.
 	private Dictionary<int,Relay> peerRelays = new Dictionary<int,Relay>();
 
-
+	//for buffering Ice candidates when we have yet to set both sdp.
 	public class IceBuffer
 	{
 		int uid;
 		WebRTCPeerConnection peer;
-		private struct candidate
+		private struct Candidate
 		{
 			string media;
 			int index;
 			string name;
 		}
+
+		public ArrayList candidates = new ArrayList();
 	}
+	Dictionary<int, IceBuffer> IceBuffers = new Dictionary<int, IceBuffer>();
 
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
