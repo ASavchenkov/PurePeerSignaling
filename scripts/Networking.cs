@@ -28,7 +28,6 @@ public class Networking : Node
 	Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
 	
 	public WebRTCMultiplayer RTCMP = new WebRTCMultiplayer();
-
 	
 	HandshakeServer handshakeServer;
 	HandshakeClient handshakeClient;
@@ -55,6 +54,18 @@ public class Networking : Node
 	//maps the uid of the peer to the uid of the relay peer.
 	private Dictionary<int,Relay> peerRelays = new Dictionary<int,Relay>();
 
+
+	public class IceBuffer
+	{
+		int uid;
+		WebRTCPeerConnection peer;
+		private struct candidate
+		{
+			string media;
+			int index;
+			string name;
+		}
+	}
 
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()

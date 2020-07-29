@@ -104,11 +104,11 @@ public class HandshakeServer : Node
         //If the peer is connected, we can transfer it over to Networking
         //Otherwise, close the connection and delete the peer.
         int uid = WSPeers[id].uid;
-        BufferedWebRTCPeerConnection peer = (BufferedWebRTCPeerConnection) networking.RTCMP.GetPeer(uid)["connection"];
+        WebRTCPeerConnection peer = (WebRTCPeerConnection) networking.RTCMP.GetPeer(uid)["connection"];
 
         if( networking.RTCMP.HasPeer(uid))
         {
-            if( peer.GetConnectionState() == BufferedWebRTCPeerConnection.ConnectionState.Connected)
+            if( peer.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected)
             {
                 peer.Disconnect("session_description_created",this,"_OfferCreated");
                 peer.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
@@ -131,7 +131,7 @@ public class HandshakeServer : Node
     public void _OfferCreated(String type, String sdp, int uid)
     {
         GD.Print("_OfferCreated");
-        ((BufferedWebRTCPeerConnection) networking.RTCMP.GetPeer(uid)["connection"]).SetLocalDescription(type,sdp);
+        ((WebRTCPeerConnection) networking.RTCMP.GetPeer(uid)["connection"]).SetLocalDescription(type,sdp);
         
         //Make a serializeable offer
         var offerDict = new Dictionary<string,dynamic>();
@@ -195,7 +195,7 @@ public class HandshakeServer : Node
             
             if(data["type"]=="authentication" && data["secret"] == "secret")
             {
-                //Add it as a BufferedWebRTCPeerConnection.
+                //Add it as a WebRTCPeerConnection.
 
                 int newUID = GenUniqueID();
                 WSPeers[id].uid = newUID;
@@ -225,7 +225,7 @@ public class HandshakeServer : Node
     {
         
         //once again needing to cast data["uid"] from uint32 to int
-        BufferedWebRTCPeerConnection peer = (BufferedWebRTCPeerConnection) networking.RTCMP.GetPeer((int)data["uid"])["connection"];
+        WebRTCPeerConnection peer = (WebRTCPeerConnection) networking.RTCMP.GetPeer((int)data["uid"])["connection"];
         GD.Print(data["uid"]);
         if(data["type"]=="offer")
         {
