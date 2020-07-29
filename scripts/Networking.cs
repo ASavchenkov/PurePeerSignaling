@@ -289,7 +289,7 @@ public class Networking : Node
 	[Remote]
 	public void Ping()
 	{
-		GD.Print("Got Ping");
+		//GD.Print("Got Ping");
 		connectivityTracker[GetTree().GetRpcSenderId()] = System.DateTime.Now;
 	}
 
