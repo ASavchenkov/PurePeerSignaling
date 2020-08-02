@@ -72,14 +72,11 @@ public class HandshakeClient : Node
             if(data["type"] == "answer")
             {
                 handshakePeer.SetRemoteDescription( data["type"], data["sdp"]);
+                networking.ICEBuffers[handshakeCounterpart].SetRemote();
             }
             else if(data["type"] == "iceCandidate")
             {
-                handshakePeer.AddIceCandidate(
-                    data["media"],
-                    data["index"],
-                    data["name"]
-                    );
+                networking.AddIceCandidate(handshakeCounterpart, data["media"], data["index"], data["name"] );
             }
         }
         else{
@@ -102,8 +99,7 @@ public class HandshakeClient : Node
                 handshakePeer = networking.AddPeer(this, data["uid"]);
                 handshakePeer.CreateOffer();
             }
-        }
-        
+        }   
     }
 
     //_OfferCreated should never be of type "answer" during handshake phase.

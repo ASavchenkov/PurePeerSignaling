@@ -40,6 +40,8 @@ public class Networking : Node
 	TimeSpan TIMEOUT = new TimeSpan(0,0,3);
 	System.Timers.Timer connectivityTimer = new System.Timers.Timer(1000);
 
+
+	#region RELAYS
 	private struct Relay
 	{
 		public int uid;
@@ -50,12 +52,13 @@ public class Networking : Node
 			askForPeers = _askForPeers;
 		}
 	}
-
 	//The list of peers we have yet to send offers to.
 	//maps the uid of the peer to the uid of the relay peer.
 	private Dictionary<int,Relay> peerRelays = new Dictionary<int,Relay>();
+	#endregion
+	
 
-
+	#region SETUP
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
@@ -113,6 +116,7 @@ public class Networking : Node
 	{
 		return new Godot.Collections.Array(new int[] {input});
 	}
+	#endregion
 
 	public WebRTCPeerConnection AddPeer(Godot.Object signalReceiver, int peerID)
 	{
@@ -122,21 +126,71 @@ public class Networking : Node
 		peer.Connect("session_description_created", signalReceiver, "_OfferCreated",intToGArr(peerID));
 		peer.Connect("ice_candidate_created", signalReceiver, "_IceCandidateCreated",intToGArr(peerID));
 
+		ICEBuffers.Add(peerID,new IceBuffer(peer));
 		RTCMP.AddPeer(peer, peerID);
 		//now emit a signal so the game knows a new peer just joined.
 		
 		return peer;
 	}
 
-	/* END SETUP RESPONSIBILITIES */
-	/* START RESPONSE RESPONSIBILITIES */
+	#region ICE BUFFERING
+	public struct BufferedCandidate
+	{
+		public string media;
+		public int index;
+		public string name;
+	}
+
+	public class IceBuffer : Godot.Object
+	{
+		bool localSet = false;
+		bool remoteSet = false;
+		public List<BufferedCandidate> buffer = new List<BufferedCandidate>();
+		private WebRTCPeerConnection peer;
+
+		public IceBuffer(WebRTCPeerConnection _peer)
+		{
+			peer = _peer;
+			peer.Connect("session_description_created", this, "_OfferCreated");
+		}
 	
+		public bool ReadyForIce()
+		{
+			return localSet && remoteSet;
+		}
+		
+		public void SetRemote()
+		{
+			remoteSet = true;
+			if( ReadyForIce())
+				ReleaseBuffer();
+		}
+
+		public void _OfferCreated()
+		{
+			localSet = true;
+			if(ReadyForIce())
+				ReleaseBuffer();
+			
+		}
+		public void ReleaseBuffer()
+		{
+			foreach( BufferedCandidate candidate in buffer)
+				peer.AddIceCandidate(candidate.media, candidate.index, candidate.name);
+		}
+		
+	}
+		
+	public Dictionary<int,IceBuffer> ICEBuffers = new Dictionary<int, IceBuffer>();
+	#endregion
+
+	#region SIGNALING
 	//This should only be called for those we have yet to connect to
 	//so we always need to relay offers.
 	public void _OfferCreated(String type, String sdp, int uid)
 	{
 		var peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
-		GD.Print(peer.SetLocalDescription(type, sdp));
+		GD.Print("Setting Local description: ", peer.SetLocalDescription(type, sdp));
 		
 		this.RpcId(peerRelays[uid].uid,"RelayOffer",  uid, RTCMP.GetUniqueId(), type, sdp);
 		
@@ -164,21 +218,27 @@ public class Networking : Node
 			//we make sure to use the same peer to send packets back for now
 			//since it's the only one we know is connected to that peer for sure.
 			peerRelays.Add(uid, new Relay(GetTree().GetRpcSenderId(),false));
-		}else{
+		}else
+		{
 			//It's an answer, so we should already have a peer in the system.
 			peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
 		}
-		
+
+		ICEBuffers[uid].SetRemote();
 		GD.Print(peer.SetRemoteDescription(type, sdp));
 	}
 
 	[Remote]
 	public void AddIceCandidate( int senderUID, string media, int index, string name)
 	{
-		GD.Print("ADDING ICE CANDIDATE OVER RPC");
+		GD.Print("ADDING ICE CANDIDATE");
 		var peer = (WebRTCPeerConnection) RTCMP.GetPeer(senderUID)["connection"];
-		var err = peer.AddIceCandidate(media, index, name);
-		GD.Print("ERR: ", err);
+		if (ICEBuffers[senderUID].ReadyForIce())
+			peer.AddIceCandidate(media, index, name);
+		else
+		{
+			ICEBuffers[senderUID].buffer.Add(new BufferedCandidate{media = media, index = index, name = name});
+		}
 	}
 
 	public void _IceCandidateCreated(String media, int index, String name, int uid)
@@ -200,14 +260,11 @@ public class Networking : Node
 	{
 		GD.Print("NETWORKING ICE CANDIDATE RELAYED");
 		this.RpcId(uid,"AddIceCandidate", senderUID, media, index, name);
-		
 	}
+	#endregion
 
 
-	/* END RESPONSE RESPONSIBILITIES */
-	/* START CONNECTIVITY RESPONSIBILITIES */
-
-
+	#region PEER SEARCH
 	[Remote]
 	public void AddPeers(byte[] packet)
 	{
@@ -254,9 +311,9 @@ public class Networking : Node
 	{
 		this.RpcId(handshakeCounterpart,"GetPeerUIDs");
 	}
+	#endregion
 
-	//PING AND TIMEOUT FUNCTIONALITY
-
+	#region TIMEOUT TRACKING
 	public void OnPeerConnected(int uid)
 	{
 		connectivityTracker.Add(uid, DateTime.Now);
@@ -292,7 +349,7 @@ public class Networking : Node
 		//GD.Print("Got Ping");
 		connectivityTracker[GetTree().GetRpcSenderId()] = System.DateTime.Now;
 	}
-
+	#endregion
 	public override void _Process(float delta)
 	{
 
