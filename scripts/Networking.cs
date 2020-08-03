@@ -57,7 +57,6 @@ public class Networking : Node
 	private Dictionary<int,Relay> peerRelays = new Dictionary<int,Relay>();
 	#endregion
 	
-
 	#region SETUP
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
@@ -166,7 +165,8 @@ public class Networking : Node
 				ReleaseBuffer();
 		}
 
-		public void _OfferCreated()
+		//Don't really use the arguments, but they're needed for signals to connect.
+		public void _OfferCreated(String type, String sdp)
 		{
 			localSet = true;
 			if(ReadyForIce())
@@ -284,6 +284,9 @@ public class Networking : Node
 		}
 	}
 
+	//This can relay peers that have connected but have yet to ask for peers,
+	//resulting in both peers getting each other's uids, and sending offers.
+	//May need to cache peerUIDs immediately on getting a fresh offer.
 	[Remote]
 	public void GetPeerUIDs()
 	{

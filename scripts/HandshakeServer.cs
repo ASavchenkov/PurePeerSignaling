@@ -230,11 +230,11 @@ public class HandshakeServer : Node
         if(data["type"]=="offer")
         {
             var err = peer.SetRemoteDescription(data["type"],data["sdp"]);
-            networking.ICEBuffers[data["uid"]].SetRemote();
+            networking.ICEBuffers[(int) data["uid"]].SetRemote();
         }
         else if (data["type"] == "iceCandidate")
         {
-            networking.AddIceCandidate(data["uid"], data["media"], data["index"],data["name"]);
+            networking.AddIceCandidate((int) data["uid"], data["media"], (int) data["index"],data["name"]);
         }
     }
     public override void _Process(float delta)
