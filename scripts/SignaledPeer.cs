@@ -28,7 +28,7 @@ public class SignaledPeer : Godot.Object
 
     int UID;
     static Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
-    public WebRTCPeerConnection peerConnection;
+    public WebRTCPeerConnection PeerConnection;
     WebRTCMultiplayer RTCMP;
     List<BufferedCandidate> buffer = new List<BufferedCandidate>();
 
@@ -43,7 +43,7 @@ public class SignaledPeer : Godot.Object
     public void ReleaseBuffer()
     {
         foreach( BufferedCandidate candidate in buffer)
-		    peerConnection.AddIceCandidate(candidate.media, candidate.index, candidate.name);
+		    PeerConnection.AddIceCandidate(candidate.media, candidate.index, candidate.name);
     }
 
     static SignaledPeer()
@@ -59,23 +59,28 @@ public class SignaledPeer : Godot.Object
     {
         UID = _UID;
         RTCMP = _RTCMP;
-        peerConnection = new WebRTCPeerConnection();
+        PeerConnection = new WebRTCPeerConnection();
         LastPing = DateTime.Now;
         // peerConnection.Connect("session_description_created", this, "_OfferCreated");
 		// peerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated");
         
-        RTCMP.AddPeer(peerConnection, UID);
+        RTCMP.AddPeer(PeerConnection, UID);
     }
 
     public void SetLocalDescription(string type, string sdp)
     {
-        peerConnection.SetLocalDescription(type, sdp);
+        PeerConnection.SetLocalDescription(type, sdp);
         localReady = true;
+        if(ReadyForIce())
+            ReleaseBuffer();
     }
     public void SetRemoteDescription(string type, string sdp)
     {
-        peerConnection.SetRemoteDescription(type, sdp);
+        PeerConnection.SetRemoteDescription(type, sdp);
         remoteReady = true;
+        if(ReadyForIce())
+            ReleaseBuffer();
+        
     }
 
     public bool ReadyForIce()
@@ -83,9 +88,13 @@ public class SignaledPeer : Godot.Object
         return remoteReady && localReady;
     }
 
+    //Automaticall skips buffering if ready for ice
     public void BufferIceCandidate(string media, int index, string name)
     {
-        buffer.Add(new BufferedCandidate{media = media, index = index, name = name});
+        if(ReadyForIce())
+            PeerConnection.AddIceCandidate(media,index, name);
+        else
+            buffer.Add(new BufferedCandidate{media = media, index = index, name = name});
     }
 
     
@@ -99,6 +108,7 @@ public class SignaledPeer : Godot.Object
     //We handle all of our own interactions with the RTCMP singleton.
     ~SignaledPeer()
     {
+        PeerConnection.Close();
         RTCMP.RemovePeer(UID);
     }
 }

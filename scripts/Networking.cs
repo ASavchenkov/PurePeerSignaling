@@ -42,7 +42,7 @@ public class Networking : Node
 	{
 		var peer = new SignaledPeer(peerID, RTCMP);
 		connectivityTimer.Elapsed+=peer.CheckTimeout;
-		var peerConnection = peer.peerConnection;
+		var peerConnection = peer.PeerConnection;
         peerConnection.Connect("session_description_created", signalReceiver, "_OfferCreated",SignaledPeer.intToGArr(peerID));
 		peerConnection.Connect("ice_candidate_created", signalReceiver, "_IceCandidateCreated",SignaledPeer.intToGArr(peerID));
         
@@ -61,7 +61,6 @@ public class Networking : Node
 		RTCMP.Initialize(1,false);
 		GetTree().NetworkPeer = RTCMP;
 
-		GetTree().Connect("network_peer_connected", this, "OnPeerConnected");
 		connectivityTimer.AutoReset = true;
 		connectivityTimer.Start();
 
@@ -131,8 +130,8 @@ public class Networking : Node
 			//we make sure to use the same peer to send packets back for now
 			//since it's the only one we know is connected to that peer for sure.
 			peer.relayUID = GetTree().GetRpcSenderId();
-			peer.askForPeers = false;
-		}else
+		}
+		else
 		{
 			//It's an answer, so we should already have a peer in the system.
 			peer = SignaledPeers[uid];
@@ -146,12 +145,8 @@ public class Networking : Node
 	{
 		GD.Print("ADDING ICE CANDIDATE");
 		var peer = SignaledPeers[senderUID];
-		if (peer.ReadyForIce())
-			peer.peerConnection.AddIceCandidate(media, index, name);
-		else
-		{
-			peer.BufferIceCandidate(media, index, name);
-		}
+		peer.BufferIceCandidate(media, index, name);
+		
 	}
 
 	public void _IceCandidateCreated(String media, int index, String name, int uid)
@@ -191,7 +186,7 @@ public class Networking : Node
 				GD.Print("ADDING THIS PEER: ", uid);
 				SignaledPeer newPeer = this.AddPeer(this, uid);
 				//Immediately create the offer since we're the ones offering.
-				newPeer.peerConnection.CreateOffer();
+				newPeer.PeerConnection.CreateOffer();
 				newPeer.relayUID = referrer;
 				UnsearchedPeers.Add(uid);
 			}

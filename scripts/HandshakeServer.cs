@@ -115,8 +115,7 @@ public class HandshakeServer : Node
         }
         else
         {
-            peer.PeerConnection.Close();
-            networking.RTCMP.RemovePeer(uid);
+            networking.SignaledPeers.Remove(uid);
         }
     
         // In both cases, remove them from the Websocket dictionaries
@@ -161,6 +160,7 @@ public class HandshakeServer : Node
 
         //will almost certainly never happen
         //but in case it does, this guarantees a unique ID if one is available.
+        //(God help you if you're playing with 2 billion+ people and one isn't available.)
         while(networking.RTCMP.HasPeer(candidate))
         {
             if(candidate==2147483647)
@@ -223,17 +223,12 @@ public class HandshakeServer : Node
     {
         
         //once again needing to cast data["uid"] from uint32 to int
-        WebRTCPeerConnection peer = (WebRTCPeerConnection) networking.RTCMP.GetPeer((int)data["uid"])["connection"];
+        SignaledPeer peer = networking.SignaledPeers[(int) data["uid"]];
         GD.Print(data["uid"]);
         if(data["type"]=="offer")
-        {
-            var err = peer.SetRemoteDescription(data["type"],data["sdp"]);
-            networking.ICEBuffers[(int) data["uid"]].SetRemote();
-        }
+            peer.SetRemoteDescription(data["type"],data["sdp"]);
         else if (data["type"] == "iceCandidate")
-        {
-            networking.AddIceCandidate((int) data["uid"], data["media"], (int) data["index"],data["name"]);
-        }
+            networking.SignaledPeers[(int) data["uid"]].BufferIceCandidate(data["media"], (int) data["index"],data["name"]);   
     }
     public override void _Process(float delta)
     {
