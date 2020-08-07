@@ -13,7 +13,6 @@ public class HandshakeServer : Node
     //reference to the parent for when we need to
     //tell it we have authenticated clients.
     private Networking networking;
-
     //exclusively used to complete the handshake phase.
     private class WSPeer{
         
@@ -52,6 +51,7 @@ public class HandshakeServer : Node
     {
         SetProcess(false);
         this.networking = (Networking) GetNode("..");
+        
         server.Connect("data_received", this, "_OnData");
         server.Connect("client_connected", this, "_PeerConnected");
         server.Connect("client_disconnected", this, "_PeerDisconnected");
@@ -77,7 +77,7 @@ public class HandshakeServer : Node
 
         foreach(KeyValuePair<int, WSPeer> p in WSPeers)
         {
-            networking.RTCMP.RemovePeer(p.Value.uid);
+            networking.SignaledPeers.Remove(p.Value.uid);
             server.DisconnectPeer(p.Key, reason: "Server Stopped");   
         }
         //Null out dicts tracking peers.
@@ -104,23 +104,21 @@ public class HandshakeServer : Node
         //If the peer is connected, we can transfer it over to Networking
         //Otherwise, close the connection and delete the peer.
         int uid = WSPeers[id].uid;
-        WebRTCPeerConnection peer = (WebRTCPeerConnection) networking.RTCMP.GetPeer(uid)["connection"];
+        SignaledPeer peer = networking.SignaledPeers[uid];
 
-        if( networking.RTCMP.HasPeer(uid))
+        if( peer.PeerConnection.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected)
         {
-            if( peer.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected)
-            {
-                peer.Disconnect("session_description_created",this,"_OfferCreated");
-                peer.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
-                peer.Connect("session_description_created",networking,"_OfferCreated",networking.intToGArr(uid));
-                peer.Connect("ice_candidate_created",networking,"_IceCandidateCreated",networking.intToGArr(uid));
-            }
-            else
-            {
-                peer.Close();
-                networking.RTCMP.RemovePeer(uid);
-            }
+            peer.PeerConnection.Disconnect("session_description_created",this,"_OfferCreated");
+            peer.PeerConnection.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
+            peer.PeerConnection.Connect("session_description_created",networking,"_OfferCreated",SignaledPeer.intToGArr(uid));
+            peer.PeerConnection.Connect("ice_candidate_created",networking,"_IceCandidateCreated",SignaledPeer.intToGArr(uid));
         }
+        else
+        {
+            peer.PeerConnection.Close();
+            networking.RTCMP.RemovePeer(uid);
+        }
+    
         // In both cases, remove them from the Websocket dictionaries
         // since that connection no longer exists.
         WSIDMap.Remove(WSPeers[id].uid);
