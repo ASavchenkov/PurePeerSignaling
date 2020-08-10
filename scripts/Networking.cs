@@ -34,21 +34,9 @@ public class Networking : Node
 	string url = "ws://192.168.1.143:3476";
 	string secret = "secret";
 
-	System.Timers.Timer connectivityTimer = new System.Timers.Timer(1000);
+	System.Timers.Timer PollTimer = new System.Timers.Timer(1000);
 
 	private List<int> UnsearchedPeers = new List<int>();
-
-	public SignaledPeer AddPeer(Godot.Object signalReceiver, int peerID)
-	{
-		var peer = new SignaledPeer(peerID, RTCMP);
-		connectivityTimer.Elapsed+=peer.CheckTimeout;
-		var peerConnection = peer.PeerConnection;
-        peerConnection.Connect("session_description_created", signalReceiver, "_OfferCreated",SignaledPeer.intToGArr(peerID));
-		peerConnection.Connect("ice_candidate_created", signalReceiver, "_IceCandidateCreated",SignaledPeer.intToGArr(peerID));
-        
-		SignaledPeers.Add(peerID,peer);
-		return peer;
-	}
 	
 	#region SETUP
 	// Called when the node enters the scene tree for the first time.
@@ -61,8 +49,8 @@ public class Networking : Node
 		RTCMP.Initialize(1,false);
 		GetTree().NetworkPeer = RTCMP;
 
-		connectivityTimer.AutoReset = true;
-		connectivityTimer.Start();
+		PollTimer.AutoReset = true;
+		PollTimer.Start();
 
 	}
 	
@@ -75,11 +63,13 @@ public class Networking : Node
 	{
 		this.secret = secret;
 	}
+
 	public void _JoinMesh()
 	{
 		GD.Print("_JoinMesh");
 		//first you need to remove yourself from the current mesh.
 		RTCMP.Close();
+		SignaledPeers = new Dictionary<int, SignaledPeer>();
 		//and stop your handshakeServer if you have one running.
 		handshakeServer._StopServer();
 		//Then tell the handshakeClient to do the handshake.
@@ -98,42 +88,52 @@ public class Networking : Node
 	#endregion
 
 	#region SIGNALING
-	
-	//This should only be called for those we have yet to connect to
-	//so we always need to relay offers.
-	public void _OfferCreated(String type, String sdp, int uid)
+
+	[Remote]
+	public void CheckRelay(int uid)
 	{
-		SignaledPeers[uid].SetLocalDescription(type,sdp);
-		this.RpcId(SignaledPeers[uid].relayUID,"RelayOffer",  uid, RTCMP.GetUniqueId(), type, sdp);
-		
-		GD.Print("NETWORKING OFFER CREATED");
+		if (SignaledPeers[uid].currentState == SignaledPeer.ConnectionState.NOMINAL)
+			RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
 	}
 
 	[Remote]
-	public void RelayOffer(int uid, int senderUID, string type, string sdp)
+	public void RelayConfirmed(int uid)
 	{
-		this.RpcId(uid, "ReceiveOffer", senderUID ,type, sdp);
+		SignaledPeers[uid].RelayConfirmed(GetTree().GetRpcSenderId());
 	}
 
-	
+	[Remote]
+	public void RelayOffer(int uid, string type, string sdp)
+	{
+		this.RpcId(uid, "ReceiveOffer", GetTree().GetRpcSenderId() ,type, sdp);
+	}
+
+	//Should never be called from anywhere other than RelayOffer
 	[Remote]
 	public void ReceiveOffer(int uid, string type, string sdp)
 	{
 		GD.Print("RECEIVE OFFER: ", type);
 
-		//if this is the case, we don't yet have them as a peer.
 		SignaledPeer peer;
+		
 		if(type == "offer")
 		{
-			peer = AddPeer(this, uid);
-			
-			//we make sure to use the same peer to send packets back for now
-			//since it's the only one we know is connected to that peer for sure.
-			peer.relayUID = GetTree().GetRpcSenderId();
+			//So we have them as a peer, and want to reset the connection.
+			if (SignaledPeers.ContainsKey(uid))
+			{
+				peer = SignaledPeers[uid];
+				peer.ResetConnection();
+			}
+			else
+			{
+				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer);
+			}
+			peer.RelayConfirmed(GetTree().GetRpcSenderId());
 		}
 		else
 		{
-			//It's an answer, so we should already have a peer in the system.
+			//It's an answer, so we should already have a peer in the system,
+			//and shouldn't need to do anything funky with it.
 			peer = SignaledPeers[uid];
 		}
 
@@ -141,33 +141,20 @@ public class Networking : Node
 	}
 
 	[Remote]
+	public void RelayIceCandidate(string media, int index, string name, int uid)
+	{
+		GD.Print("NETWORKING ICE CANDIDATE RELAYED");
+		this.RpcId(uid,"AddIceCandidate", GetTree().GetRpcSenderId(), media, index, name);
+	}
+
+	[Remote]
 	public void AddIceCandidate( int senderUID, string media, int index, string name)
 	{
+
 		GD.Print("ADDING ICE CANDIDATE");
 		var peer = SignaledPeers[senderUID];
 		peer.BufferIceCandidate(media, index, name);
 		
-	}
-
-	public void _IceCandidateCreated(String media, int index, String name, int uid)
-	{
-		if((bool)RTCMP.GetPeer(uid)["connected"])
-			this.RpcId(uid,"AddIceCandidate", RTCMP.GetUniqueId(), media, index, name);
-		//we don't need to check connectivity  for the relay
-		//because peers only get added to peerRelays when ["connected"] is true.
-		else if (SignaledPeers.ContainsKey(uid))
-		{
-			this.RpcId(SignaledPeers[uid].relayUID,"RelayIceCandidate", RTCMP.GetUniqueId(), media, index, name, uid);
-		}
-		GD.Print("NETWORKING ICE CANDIDATE CREATED");
-	}
-
-
-	[Remote]
-	public void RelayIceCandidate( int senderUID, string media, int index, string name, int uid)
-	{
-		GD.Print("NETWORKING ICE CANDIDATE RELAYED");
-		this.RpcId(uid,"AddIceCandidate", senderUID, media, index, name);
 	}
 	#endregion
 
@@ -181,13 +168,11 @@ public class Networking : Node
 		foreach(int uid in newPeers)
 		{
 			//add them if we don't already have them.
-			if (!RTCMP.HasPeer(uid) && !(uid == RTCMP.GetUniqueId()))
+			if (!SignaledPeers.ContainsKey(uid) && !(uid == RTCMP.GetUniqueId()))
 			{
 				GD.Print("ADDING THIS PEER: ", uid);
-				SignaledPeer newPeer = this.AddPeer(this, uid);
-				//Immediately create the offer since we're the ones offering.
-				newPeer.PeerConnection.CreateOffer();
-				newPeer.relayUID = referrer;
+				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer);
+
 				UnsearchedPeers.Add(uid);
 			}
 		}
@@ -229,9 +214,9 @@ public class Networking : Node
 	[Remote]
 	public void Ping()
 	{
-		//GD.Print("Got Ping");
 		SignaledPeers[GetTree().GetRpcSenderId()].LastPing = System.DateTime.Now;
 	}
+
 
 	public override void _Process(float delta)
 	{
@@ -241,13 +226,12 @@ public class Networking : Node
 		foreach( int uid in UnsearchedPeers)
 		{
 			//check if they're connected.
-			if ( (bool)RTCMP.GetPeer(uid)["connected"])
+			if ( SignaledPeers[uid].currentState == SignaledPeer.ConnectionState.NOMINAL)
 			{
 				//if they are, then ask them for their peers
 				this.RpcId(uid,"GetPeerUIDs");
 				//then remove them from the list.
 				toRemove.Add(uid);
-
 			}
 		}
 		

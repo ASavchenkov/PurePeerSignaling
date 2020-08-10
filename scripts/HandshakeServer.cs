@@ -106,12 +106,10 @@ public class HandshakeServer : Node
         int uid = WSPeers[id].uid;
         SignaledPeer peer = networking.SignaledPeers[uid];
 
-        if( peer.PeerConnection.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected)
+        if( peer.currentState == SignaledPeer.ConnectionState.NOMINAL)
         {
             peer.PeerConnection.Disconnect("session_description_created",this,"_OfferCreated");
             peer.PeerConnection.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
-            peer.PeerConnection.Connect("session_description_created",networking,"_OfferCreated",SignaledPeer.intToGArr(uid));
-            peer.PeerConnection.Connect("ice_candidate_created",networking,"_IceCandidateCreated",SignaledPeer.intToGArr(uid));
         }
         else
         {
@@ -128,6 +126,7 @@ public class HandshakeServer : Node
     public void _OfferCreated(String type, String sdp, int uid)
     {
         GD.Print("_OfferCreated");
+        
         ((WebRTCPeerConnection) networking.RTCMP.GetPeer(uid)["connection"]).SetLocalDescription(type,sdp);
         
         //Make a serializeable offer
