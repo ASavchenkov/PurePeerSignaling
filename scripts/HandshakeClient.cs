@@ -69,7 +69,7 @@ public class HandshakeClient : Node
             if(data["type"] == "answer")
                 handshakePeer.SetRemoteDescription( data["type"], data["sdp"]);
             else if(data["type"] == "iceCandidate")
-                networking.AddIceCandidate(handshakeCounterpart, data["media"], data["index"], data["name"] );   
+                handshakePeer.BufferIceCandidate(data["media"], data["index"], data["name"] );   
         }
         else{
             if(data["type"] == "authentication" && data["status"] == "success")
@@ -88,7 +88,8 @@ public class HandshakeClient : Node
 
                 //create a peer and link it to us.
                 handshakeCounterpart = data["uid"];
-                handshakePeer = networking.AddPeer(this, data["uid"]);
+                handshakePeer = new SignaledPeer(handshakeCounterpart, networking, SignaledPeer.ConnectionState.MANUAL, networking.PollTimer);
+                networking.SignaledPeers.Add(handshakeCounterpart, handshakePeer);
                 handshakePeer.PeerConnection.CreateOffer();
             }
         }   
@@ -130,8 +131,6 @@ public class HandshakeClient : Node
         WSClient.DisconnectFromHost(reason:"Handshake Complete");
         handshakePeer.Disconnect("session_description_created",this,"_OfferCreated");
         handshakePeer.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
-        handshakePeer.Connect("session_description_created",networking,"_OfferCreated",SignaledPeer.intToGArr(handshakeCounterpart));
-        handshakePeer.Connect("ice_candidate_created",networking,"_IceCandidateCreated",SignaledPeer.intToGArr(handshakeCounterpart));
         
         SetProcess(false); //Our job is done here.
         networking.StartPeerSearch(handshakeCounterpart);
@@ -140,7 +139,7 @@ public class HandshakeClient : Node
     public override void _Process(float delta)
     {
         WSClient.Poll();
-        if(!(handshakePeer is null) && (bool) networking.RTCMP.GetPeer(handshakeCounterpart)["connected"])
+        if(!(handshakePeer is null) && handshakePeer.currentState == SignaledPeer.ConnectionState.NOMINAL)
         {
             _FinishHandshake();
         }

@@ -126,8 +126,8 @@ public class HandshakeServer : Node
     public void _OfferCreated(String type, String sdp, int uid)
     {
         GD.Print("_OfferCreated");
-        
-        ((WebRTCPeerConnection) networking.RTCMP.GetPeer(uid)["connection"]).SetLocalDescription(type,sdp);
+
+        networking.SignaledPeers[uid].SetLocalDescription(type,sdp);
         
         //Make a serializeable offer
         var offerDict = new Dictionary<string,dynamic>();
@@ -137,7 +137,7 @@ public class HandshakeServer : Node
         server.GetPeer(WSIDMap[uid]).PutPacket(payload);
     }
 
-    public void _IceCandidateCreated(String media, int index, String name, int uid)
+    public void _IceCandidateCreated(string media, int index, string name, int uid)
     {
         var iceDict = new Dictionary<string,dynamic>();
         iceDict.Add("type","iceCandidate");
@@ -196,7 +196,11 @@ public class HandshakeServer : Node
 
                 int newUID = GenUniqueID();
                 WSPeers[id].uid = newUID;
-                networking.AddPeer(this, newUID);
+                
+                SignaledPeer newPeer = new SignaledPeer(newUID, networking, SignaledPeer.ConnectionState.MANUAL, networking.PollTimer);
+                networking.SignaledPeers.Add(newUID, newPeer);
+                newPeer.PeerConnection.Connect("session_description_created", this, "_OfferCreated", SignaledPeer.intToGArr(newUID));
+                newPeer.PeerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated",SignaledPeer.intToGArr(newUID));
                 WSIDMap.Add(newUID,id);
 
                 //Tell the peer that they've authenticated successfully.

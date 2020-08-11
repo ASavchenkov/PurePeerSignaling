@@ -34,7 +34,7 @@ public class Networking : Node
 	string url = "ws://192.168.1.143:3476";
 	string secret = "secret";
 
-	System.Timers.Timer PollTimer = new System.Timers.Timer(1000);
+	public System.Timers.Timer PollTimer = new System.Timers.Timer(1000);
 
 	private List<int> UnsearchedPeers = new List<int>();
 	

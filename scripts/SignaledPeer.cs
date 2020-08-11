@@ -205,16 +205,15 @@ public class SignaledPeer : Godot.Object
                     networking.RpcId(nextCandidate, "CheckRelay", UID);
                 }
                 break;
-            case ConnectionState.RELAY:
-                if((bool)networking.RTCMP.GetPeer(UID)["connected"])
-                {
-                    networking.SignaledPeers[relayUID].Disconnect("ConnectionLost", this, "RelayLost");
-                    LastPing = DateTime.Now;
-                    currentState = ConnectionState.NOMINAL;
-                }
-                break;
-
         }
+        if((bool)networking.RTCMP.GetPeer(UID)["connected"])
+        {
+            networking.SignaledPeers[relayUID].Disconnect("ConnectionLost", this, "RelayLost");
+            LastPing = DateTime.Now;
+            currentState = ConnectionState.NOMINAL;
+        }
+
+        
 
     }
 
