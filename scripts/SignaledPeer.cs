@@ -134,6 +134,7 @@ public class SignaledPeer : Godot.Object
     {
         Random r = new Random();
         relayCandidates = (Queue<int>) from i in networking.SignaledPeers.Keys.OrderBy(x => r.Next()) select i;
+        GD.Print(relayCandidates.Count);
     }
 
     #region ICE_BUFFERING
@@ -191,12 +192,13 @@ public class SignaledPeer : Godot.Object
 
     public void Poll(object source, System.Timers.ElapsedEventArgs e)
     {
-        
+        GD.Print(currentState);
         switch(currentState)
         {
             case ConnectionState.NOMINAL:
                 if(RESET_TIME < (DateTime.Now - LastPing))
                 {
+                    GD.Print("resetting: ", (DateTime.Now - LastPing));
                     PeerConnection.Close();
                     PeerConnection.Initialize(RTCInitializer);
                     remoteReady = false;
@@ -205,13 +207,12 @@ public class SignaledPeer : Godot.Object
                     ShuffleRelayCandidates();
                     EmitSignal("ConnectionLost");
                     currentState = ConnectionState.RELAY_SEARCH;
-                    
                 }
                 break;
             case ConnectionState.RELAY_SEARCH:
+                GD.Print(currentState);
                 if(relayCandidates.Count == 0)
                     ShuffleRelayCandidates();
-
                 //If it's still zero, then there's no relay candidates
                 //so we should do nothing.
                 if(relayCandidates.Count!=0)
@@ -222,7 +223,7 @@ public class SignaledPeer : Godot.Object
                 break;
         }
 
-        if((bool)networking.RTCMP.GetPeer(UID)["connected"])
+        if((bool)networking.RTCMP.GetPeer(UID)["connected"] && currentState != ConnectionState.NOMINAL)
         {
 
             if(networking.SignaledPeers.ContainsKey(relayUID))

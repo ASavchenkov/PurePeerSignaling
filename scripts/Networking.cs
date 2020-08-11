@@ -51,6 +51,7 @@ public class Networking : Node
 
 		PollTimer.AutoReset = true;
 		PollTimer.Start();
+		PollTimer.Elapsed+=LaunchPing;
 
 	}
 	
@@ -211,10 +212,15 @@ public class Networking : Node
 	}
 	#endregion
 
+	public void LaunchPing(object source, System.Timers.ElapsedEventArgs e)
+	{
+		Rpc("Ping");
+	}
 
 	[Remote]
 	public void Ping()
 	{
+		GD.Print("receiving ping: ", GetTree().GetRpcSenderId());
 		SignaledPeers[GetTree().GetRpcSenderId()].LastPing = System.DateTime.Now;
 	}
 
