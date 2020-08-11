@@ -172,7 +172,7 @@ public class Networking : Node
 			{
 				GD.Print("ADDING THIS PEER: ", uid);
 				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer);
-
+				SignaledPeers.Add(uid, newPeer);
 				UnsearchedPeers.Add(uid);
 			}
 		}
@@ -187,7 +187,8 @@ public class Networking : Node
 		int requester = GetTree().GetRpcSenderId();
 		
 		GD.Print("Getting peers for: ", requester);
-		GD.Print(SignaledPeers.Keys);
+		foreach( var key in SignaledPeers.Keys)
+			GD.Print(key);
 		
 		//maybe there's a way to cast non-generic collections
 		//to generic collections?

@@ -104,7 +104,7 @@ public class HandshakeServer : Node
         int uid = WSPeers[id].uid;
         SignaledPeer peer = networking.SignaledPeers[uid];
 
-        if( peer.currentState == SignaledPeer.ConnectionState.NOMINAL)
+        if( (bool)networking.RTCMP.GetPeer(uid)["connected"])
         {
             peer.PeerConnection.Disconnect("session_description_created",this,"_OfferCreated");
             peer.PeerConnection.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");

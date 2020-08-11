@@ -60,6 +60,12 @@ public class SignaledPeer : Godot.Object
 		RTCInitializer.Add("iceServers", stunServerDict);
     }
 
+    //Please never call this.
+    //Godot has a known issue with not having parameterless constructors.
+    public SignaledPeer()
+    {
+    }
+
     //Networking is basically a singleton.
     //(Just poorly implemented).
     public SignaledPeer(int _UID, Networking networking, ConnectionState startingState, System.Timers.Timer _pollTimer)
@@ -223,7 +229,6 @@ public class SignaledPeer : Godot.Object
                 TryDisconnect(networking.SignaledPeers[relayUID], "ConnectionLost", this, "RelayLost");
             LastPing = DateTime.Now;
             currentState = ConnectionState.NOMINAL;
-            GD.Print("End of If statement");
         }
 
 
@@ -233,7 +238,12 @@ public class SignaledPeer : Godot.Object
     //We handle all of our own interactions with the RTCMP singleton.
     ~SignaledPeer()
     {
+        try{
         PeerConnection.Close();
         networking.RTCMP.RemovePeer(UID);
+        }catch(Exception e)
+        {
+            GD.Print(e.ToString());
+        }
     }
 }

@@ -133,8 +133,8 @@ public class HandshakeClient : Node
     {
         GD.Print("_FinishHandshake");
         WSClient.DisconnectFromHost(reason:"Handshake Complete");
-        handshakePeer.Disconnect("session_description_created",this,"_OfferCreated");
-        handshakePeer.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
+        handshakePeer.PeerConnection.Disconnect("session_description_created",this,"_OfferCreated");
+        handshakePeer.PeerConnection.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
         
         SetProcess(false); //Our job is done here.
         networking.StartPeerSearch(handshakeCounterpart);
