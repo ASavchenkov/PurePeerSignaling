@@ -159,13 +159,21 @@ public class SignaledPeer : Godot.Object
         }
     }
 
+    //If nothing is there, don't do anything.
+    private void TryDisconnect(Godot.Object original, string signal, Godot.Object target, string method)
+    {
+        if(original.IsConnected(signal, target, method))
+            original.Disconnect(signal,target,method);
+    }
+
     public void RelayConfirmed(int uid)
     {
         //If someone gets back to us late, we ignore them.
         if(currentState == ConnectionState.RELAY_SEARCH)
         {
+            
             if(networking.SignaledPeers.ContainsKey(relayUID))
-                networking.SignaledPeers[relayUID].Disconnect("ConnectionLost",this, "RelayLost");
+                TryDisconnect(networking.SignaledPeers[relayUID],"ConnectionLost",this, "RelayLost");
             
             relayUID = uid;
             networking.SignaledPeers[relayUID].Connect("ConnectionLost",this, "RelayLost");
@@ -177,6 +185,7 @@ public class SignaledPeer : Godot.Object
 
     public void Poll(object source, System.Timers.ElapsedEventArgs e)
     {
+        
         switch(currentState)
         {
             case ConnectionState.NOMINAL:
@@ -206,14 +215,17 @@ public class SignaledPeer : Godot.Object
                 }
                 break;
         }
+
         if((bool)networking.RTCMP.GetPeer(UID)["connected"])
         {
-            networking.SignaledPeers[relayUID].Disconnect("ConnectionLost", this, "RelayLost");
+
+            if(networking.SignaledPeers.ContainsKey(relayUID))
+                TryDisconnect(networking.SignaledPeers[relayUID], "ConnectionLost", this, "RelayLost");
             LastPing = DateTime.Now;
             currentState = ConnectionState.NOMINAL;
+            GD.Print("End of If statement");
         }
 
-        
 
     }
 

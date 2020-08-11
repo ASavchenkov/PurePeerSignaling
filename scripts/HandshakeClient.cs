@@ -89,6 +89,10 @@ public class HandshakeClient : Node
                 //create a peer and link it to us.
                 handshakeCounterpart = data["uid"];
                 handshakePeer = new SignaledPeer(handshakeCounterpart, networking, SignaledPeer.ConnectionState.MANUAL, networking.PollTimer);
+                
+                handshakePeer.PeerConnection.Connect("session_description_created", this, "_OfferCreated", SignaledPeer.intToGArr(handshakeCounterpart));
+                handshakePeer.PeerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated",SignaledPeer.intToGArr(handshakeCounterpart));
+                
                 networking.SignaledPeers.Add(handshakeCounterpart, handshakePeer);
                 handshakePeer.PeerConnection.CreateOffer();
             }
