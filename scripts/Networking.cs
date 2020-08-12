@@ -97,6 +97,7 @@ public class Networking : Node
 			RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
 	}
 
+	
 	[Remote]
 	public void RelayConfirmed(int uid)
 	{
@@ -122,12 +123,15 @@ public class Networking : Node
 			//So we have them as a peer, and want to reset the connection.
 			if (SignaledPeers.ContainsKey(uid))
 			{
+				GD.Print("RESET OFFER");
 				peer = SignaledPeers[uid];
 				peer.ResetConnection();
 			}
 			else
 			{
-				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer);
+				GD.Print("NEW OFFER");
+				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer, false);
+				SignaledPeers.Add(uid,peer);
 			}
 			peer.RelayConfirmed(GetTree().GetRpcSenderId());
 		}
@@ -135,6 +139,7 @@ public class Networking : Node
 		{
 			//It's an answer, so we should already have a peer in the system,
 			//and shouldn't need to do anything funky with it.
+			GD.Print("ITS AN ANSWER");
 			peer = SignaledPeers[uid];
 		}
 
@@ -153,6 +158,8 @@ public class Networking : Node
 	{
 
 		GD.Print("ADDING ICE CANDIDATE");
+		foreach( int k in SignaledPeers.Keys)
+			GD.Print(k);
 		var peer = SignaledPeers[senderUID];
 		peer.BufferIceCandidate(media, index, name);
 		
@@ -172,7 +179,7 @@ public class Networking : Node
 			if (!SignaledPeers.ContainsKey(uid) && !(uid == RTCMP.GetUniqueId()))
 			{
 				GD.Print("ADDING THIS PEER: ", uid);
-				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer);
+				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer, true);
 				SignaledPeers.Add(uid, newPeer);
 				UnsearchedPeers.Add(uid);
 			}
@@ -220,7 +227,6 @@ public class Networking : Node
 	[Remote]
 	public void Ping()
 	{
-		GD.Print("receiving ping: ", GetTree().GetRpcSenderId());
 		SignaledPeers[GetTree().GetRpcSenderId()].LastPing = System.DateTime.Now;
 	}
 

@@ -47,10 +47,9 @@ public class SignaledPeer : Godot.Object
     public ConnectionState currentState;
     System.Timers.Timer pollTimer;
 
-    private string offerType;
-    private string offerSdp;
+    private bool initiator = false;
 
-    private Queue<int> relayCandidates;
+    private Queue<int> relayCandidates = new Queue<int>();
 
     static SignaledPeer()
     {
@@ -68,12 +67,12 @@ public class SignaledPeer : Godot.Object
 
     //Networking is basically a singleton.
     //(Just poorly implemented).
-    public SignaledPeer(int _UID, Networking networking, ConnectionState startingState, System.Timers.Timer _pollTimer)
+    public SignaledPeer(int _UID, Networking networking, ConnectionState startingState, System.Timers.Timer _pollTimer, bool _initiator)
     {
         UID = _UID;
         this.networking = networking;
         currentState = startingState;
-
+        initiator = _initiator;
         pollTimer = _pollTimer;
         pollTimer.Elapsed+= this.Poll;
 
@@ -85,6 +84,7 @@ public class SignaledPeer : Godot.Object
         networking.RTCMP.AddPeer(PeerConnection, UID);
         
         LastPing = DateTime.Now;
+        GD.Print("SIGNALED PEER CONSTRUCTOR");
     }
 
     public void ResetConnection()
@@ -93,6 +93,7 @@ public class SignaledPeer : Godot.Object
         PeerConnection.Initialize(RTCInitializer);
         LastPing = DateTime.Now;
         currentState = ConnectionState.RELAY_SEARCH;
+        GD.Print("RESET CONNECTION");
     }
 
     public void SetLocalDescription(string type, string sdp)
@@ -101,6 +102,7 @@ public class SignaledPeer : Godot.Object
         localReady = true;
         if(ReadyForIce())
             ReleaseBuffer();
+        GD.Print("SET LOCAL DESCRIPTION");
     }
     public void SetRemoteDescription(string type, string sdp)
     {
@@ -108,13 +110,15 @@ public class SignaledPeer : Godot.Object
         remoteReady = true;
         if(ReadyForIce())
             ReleaseBuffer();
+        GD.Print("SET REMOTE DESCRIPTION");
     }
 
     public void _OfferCreated(string type, string sdp)
     {
         SetLocalDescription(type,sdp);
         if(currentState == ConnectionState.RELAY)
-            networking.RpcId(relayUID, "RelayOffer", UID, type, sdp);   
+            networking.RpcId(relayUID, "RelayOffer", UID, type, sdp);
+        GD.Print("OFFER CREATED: ", type); 
     }
 
     public void _IceCandidateCreated(string media, int index, string name)
@@ -125,7 +129,10 @@ public class SignaledPeer : Godot.Object
                 networking.RpcId(UID, "AddIceCandidate", networking.GetTree().GetNetworkUniqueId(), media, index, name);
                 break;
             case ConnectionState.RELAY:
-                networking.RelayIceCandidate(media, index, name, UID);
+                networking.RpcId(relayUID,"RelayIceCandidate",media, index, name, UID);
+                break;
+            default:
+                GD.Print("ICE GENERATION IGNORED");
                 break;
         }
     }
@@ -133,8 +140,9 @@ public class SignaledPeer : Godot.Object
     private void ShuffleRelayCandidates()
     {
         Random r = new Random();
-        relayCandidates = (Queue<int>) from i in networking.SignaledPeers.Keys.OrderBy(x => r.Next()) select i;
-        GD.Print(relayCandidates.Count);
+        IEnumerable<int> filtered = networking.SignaledPeers.Keys.Where(uid => networking.SignaledPeers[uid].currentState == ConnectionState.NOMINAL);
+        relayCandidates = new Queue<int>(filtered.OrderBy(x => r.Next()));
+        GD.Print("ShuffleRelayCandidates: ", relayCandidates.Count);
     }
 
     #region ICE_BUFFERING
@@ -184,15 +192,18 @@ public class SignaledPeer : Godot.Object
             
             relayUID = uid;
             networking.SignaledPeers[relayUID].Connect("ConnectionLost",this, "RelayLost");
+            if(initiator)
+                PeerConnection.CreateOffer();
+
             currentState = ConnectionState.RELAY;
-            PeerConnection.CreateOffer();
+            GD.Print("RELAY CONFIRMED");
         }
         
     }
 
     public void Poll(object source, System.Timers.ElapsedEventArgs e)
     {
-        GD.Print(currentState);
+        GD.Print(UID, " ", currentState);
         switch(currentState)
         {
             case ConnectionState.NOMINAL:
@@ -210,7 +221,7 @@ public class SignaledPeer : Godot.Object
                 }
                 break;
             case ConnectionState.RELAY_SEARCH:
-                GD.Print(currentState);
+            GD.Print("yup relay search");
                 if(relayCandidates.Count == 0)
                     ShuffleRelayCandidates();
                 //If it's still zero, then there's no relay candidates
@@ -218,6 +229,7 @@ public class SignaledPeer : Godot.Object
                 if(relayCandidates.Count!=0)
                 {
                     int nextCandidate = relayCandidates.Dequeue();
+                    GD.Print("NEXT CANDIDATE:", nextCandidate);
                     networking.RpcId(nextCandidate, "CheckRelay", UID);
                 }
                 break;
