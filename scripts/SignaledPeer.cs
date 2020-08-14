@@ -94,6 +94,7 @@ public class SignaledPeer : Godot.Object
         LastPing = DateTime.Now;
         currentState = ConnectionState.RELAY_SEARCH;
         GD.Print("RESET CONNECTION");
+        Poll();
     }
 
     public void SetLocalDescription(string type, string sdp)
@@ -103,6 +104,7 @@ public class SignaledPeer : Godot.Object
         if(ReadyForIce())
             ReleaseBuffer();
         GD.Print("SET LOCAL DESCRIPTION");
+        Poll();
     }
     public void SetRemoteDescription(string type, string sdp)
     {
@@ -111,6 +113,7 @@ public class SignaledPeer : Godot.Object
         if(ReadyForIce())
             ReleaseBuffer();
         GD.Print("SET REMOTE DESCRIPTION");
+        Poll();
     }
 
     public void _OfferCreated(string type, string sdp)
@@ -141,7 +144,7 @@ public class SignaledPeer : Godot.Object
     {
         Random r = new Random();
         IEnumerable<int> filtered = networking.SignaledPeers.Keys.Where(uid => networking.SignaledPeers[uid].currentState == ConnectionState.NOMINAL);
-        relayCandidates = new Queue<int>(filtered.OrderBy(x => r.Next()));
+        relayCandidates = new Queue<int>(filtered.OrderBy(x => x));
         GD.Print("ShuffleRelayCandidates: ", relayCandidates.Count);
     }
 
@@ -155,6 +158,7 @@ public class SignaledPeer : Godot.Object
     {
         foreach( BufferedCandidate candidate in buffer)
 		    PeerConnection.AddIceCandidate(candidate.media, candidate.index, candidate.name);
+        Poll();
     }
     //Automaticall skips buffering if ready for ice
     public void BufferIceCandidate(string media, int index, string name)
@@ -163,6 +167,7 @@ public class SignaledPeer : Godot.Object
             PeerConnection.AddIceCandidate(media,index, name);
         else
             buffer.Add(new BufferedCandidate{media = media, index = index, name = name});
+        Poll();
     }
     #endregion
 
@@ -171,6 +176,7 @@ public class SignaledPeer : Godot.Object
         if(currentState == ConnectionState.RELAY)
         {
             currentState = ConnectionState.RELAY_SEARCH;
+            Poll();
         }
     }
 
@@ -197,11 +203,17 @@ public class SignaledPeer : Godot.Object
 
             currentState = ConnectionState.RELAY;
             GD.Print("RELAY CONFIRMED");
+            Poll();
         }
         
     }
 
     public void Poll(object source, System.Timers.ElapsedEventArgs e)
+    {
+        Poll();
+    }
+
+    public void Poll()
     {
         GD.Print(UID, " ", currentState);
         switch(currentState)
