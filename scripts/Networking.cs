@@ -24,11 +24,9 @@ public class Networking : Node
 	[Signal]
 	public delegate void ConnectedToSession(int uid);
 
-	//used to initialize every peer with some stun servers.
-	Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
 	
 	public WebRTCMultiplayer RTCMP = new WebRTCMultiplayer();
-
+	public Dictionary<int, SignaledPeer> SignaledPeers = new Dictionary<int, SignaledPeer>();
 	
 	HandshakeServer handshakeServer;
 	HandshakeClient handshakeClient;
@@ -36,48 +34,24 @@ public class Networking : Node
 	string url = "ws://192.168.1.143:3476";
 	string secret = "secret";
 
-	Dictionary<int, DateTime> connectivityTracker = new Dictionary<int, DateTime>();
-	TimeSpan TIMEOUT = new TimeSpan(0,0,3);
-	System.Timers.Timer connectivityTimer = new System.Timers.Timer(1000);
+	public System.Timers.Timer PollTimer = new System.Timers.Timer(1000);
 
-
-	#region RELAYS
-	private struct Relay
-	{
-		public int uid;
-		public bool askForPeers;
-		public Relay(int _uid, bool _askForPeers)
-		{
-			uid = _uid;
-			askForPeers = _askForPeers;
-		}
-	}
-	//The list of peers we have yet to send offers to.
-	//maps the uid of the peer to the uid of the relay peer.
-	private Dictionary<int,Relay> peerRelays = new Dictionary<int,Relay>();
-	#endregion
+	private List<int> UnsearchedPeers = new List<int>();
 	
 	#region SETUP
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
 		GD.Print("Running Ready");
-		//build the initializer dictionary since dictionary literals aren't a thing in c#
-		var stunServerArr = new Godot.Collections.Array(new String [] {"stun:stun.l.google.com:19302"});
-		var stunServerDict= new Godot.Collections.Dictionary();
-		stunServerDict.Add("urls",stunServerArr);
-		RTCInitializer.Add("iceServers", stunServerDict);
-		
 		handshakeServer = (HandshakeServer) GetNode("HandshakeServer");
 		handshakeClient = (HandshakeClient) GetNode("HandshakeClient");
 		
 		RTCMP.Initialize(1,false);
 		GetTree().NetworkPeer = RTCMP;
 
-		GetTree().Connect("network_peer_connected", this, "OnPeerConnected");
-		connectivityTimer.Elapsed += this.CheckTimeout;
-		connectivityTimer.AutoReset = true;
-		connectivityTimer.Start();
+		PollTimer.AutoReset = true;
+		PollTimer.Start();
+		PollTimer.Elapsed+=LaunchPing;
 
 	}
 	
@@ -90,15 +64,16 @@ public class Networking : Node
 	{
 		this.secret = secret;
 	}
+
 	public void _JoinMesh()
 	{
 		GD.Print("_JoinMesh");
 		//first you need to remove yourself from the current mesh.
 		RTCMP.Close();
+		SignaledPeers = new Dictionary<int, SignaledPeer>();
 		//and stop your handshakeServer if you have one running.
 		handshakeServer._StopServer();
 		//Then tell the handshakeClient to do the handshake.
-
 		handshakeClient.Handshake(url, secret);
 	}
 
@@ -111,155 +86,84 @@ public class Networking : Node
 		handshakeServer._StopServer();
 	}
 	
-	public Godot.Collections.Array intToGArr(int input)
-	{
-		return new Godot.Collections.Array(new int[] {input});
-	}
-	#endregion
-
-	public WebRTCPeerConnection AddPeer(Godot.Object signalReceiver, int peerID)
-	{
-		
-		var peer = new WebRTCPeerConnection();
-		peer.Initialize(RTCInitializer);
-		peer.Connect("session_description_created", signalReceiver, "_OfferCreated",intToGArr(peerID));
-		peer.Connect("ice_candidate_created", signalReceiver, "_IceCandidateCreated",intToGArr(peerID));
-
-		ICEBuffers.Add(peerID,new IceBuffer(peer));
-		RTCMP.AddPeer(peer, peerID);
-		//now emit a signal so the game knows a new peer just joined.
-		
-		return peer;
-	}
-
-	#region ICE BUFFERING
-	public struct BufferedCandidate
-	{
-		public string media;
-		public int index;
-		public string name;
-	}
-
-	public class IceBuffer : Godot.Object
-	{
-		bool localSet = false;
-		bool remoteSet = false;
-		public List<BufferedCandidate> buffer = new List<BufferedCandidate>();
-		private WebRTCPeerConnection peer;
-
-		public IceBuffer(WebRTCPeerConnection _peer)
-		{
-			peer = _peer;
-			peer.Connect("session_description_created", this, "_OfferCreated");
-		}
-	
-		public bool ReadyForIce()
-		{
-			return localSet && remoteSet;
-		}
-		
-		public void SetRemote()
-		{
-			remoteSet = true;
-			if( ReadyForIce())
-				ReleaseBuffer();
-		}
-
-		//Don't really use the arguments, but they're needed for signals to connect.
-		public void _OfferCreated(String type, String sdp)
-		{
-			localSet = true;
-			if(ReadyForIce())
-				ReleaseBuffer();
-			
-		}
-		public void ReleaseBuffer()
-		{
-			foreach( BufferedCandidate candidate in buffer)
-				peer.AddIceCandidate(candidate.media, candidate.index, candidate.name);
-		}
-		
-	}
-		
-	public Dictionary<int,IceBuffer> ICEBuffers = new Dictionary<int, IceBuffer>();
 	#endregion
 
 	#region SIGNALING
-	//This should only be called for those we have yet to connect to
-	//so we always need to relay offers.
-	public void _OfferCreated(String type, String sdp, int uid)
-	{
-		var peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
-		GD.Print("Setting Local description: ", peer.SetLocalDescription(type, sdp));
-		
-		this.RpcId(peerRelays[uid].uid,"RelayOffer",  uid, RTCMP.GetUniqueId(), type, sdp);
-		
-		GD.Print("NETWORKING OFFER CREATED");
-	}
 
 	[Remote]
-	public void RelayOffer(int uid, int senderUID, string type, string sdp)
+	public void CheckRelay(int uid)
 	{
-		this.RpcId(uid, "ReceiveOffer", senderUID ,type, sdp);
+		if (SignaledPeers[uid].currentState == SignaledPeer.ConnectionState.NOMINAL)
+			RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
 	}
 
 	
+	[Remote]
+	public void RelayConfirmed(int uid)
+	{
+		SignaledPeers[uid].RelayConfirmed(GetTree().GetRpcSenderId());
+	}
+
+	[Remote]
+	public void RelayOffer(int uid, string type, string sdp)
+	{
+		this.RpcId(uid, "ReceiveOffer", GetTree().GetRpcSenderId() ,type, sdp);
+	}
+
+	//Should never be called from anywhere other than RelayOffer
 	[Remote]
 	public void ReceiveOffer(int uid, string type, string sdp)
 	{
 		GD.Print("RECEIVE OFFER: ", type);
 
-		//if this is the case, we don't yet have them as a peer.
-		WebRTCPeerConnection peer;
+		SignaledPeer peer;
+		
 		if(type == "offer")
 		{
-			peer = this.AddPeer(this, uid);
-
-			//we make sure to use the same peer to send packets back for now
-			//since it's the only one we know is connected to that peer for sure.
-			peerRelays.Add(uid, new Relay(GetTree().GetRpcSenderId(),false));
-		}else
+			//So we have them as a peer, and want to reset the connection.
+			if (SignaledPeers.ContainsKey(uid))
+			{
+				GD.Print("RESET OFFER");
+				peer = SignaledPeers[uid];
+				peer.ResetConnection();
+			}
+			else
+			{
+				GD.Print("NEW OFFER");
+				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer, false);
+				SignaledPeers.Add(uid,peer);
+			}
+			peer.RelayConfirmed(GetTree().GetRpcSenderId());
+			
+		}
+		else
 		{
-			//It's an answer, so we should already have a peer in the system.
-			peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
+			//It's an answer, so we should already have a peer in the system,
+			//and shouldn't need to do anything funky with it.
+			GD.Print("ITS AN ANSWER");
+			peer = SignaledPeers[uid];
 		}
 
-		ICEBuffers[uid].SetRemote();
-		GD.Print(peer.SetRemoteDescription(type, sdp));
+		peer.SetRemoteDescription(type,sdp);
+	}
+
+	[Remote]
+	public void RelayIceCandidate(string media, int index, string name, int uid)
+	{
+		GD.Print("NETWORKING ICE CANDIDATE RELAYED");
+		this.RpcId(uid,"AddIceCandidate", GetTree().GetRpcSenderId(), media, index, name);
 	}
 
 	[Remote]
 	public void AddIceCandidate( int senderUID, string media, int index, string name)
 	{
+
 		GD.Print("ADDING ICE CANDIDATE");
-		var peer = (WebRTCPeerConnection) RTCMP.GetPeer(senderUID)["connection"];
-		if (ICEBuffers[senderUID].ReadyForIce())
-			peer.AddIceCandidate(media, index, name);
-		else
-		{
-			ICEBuffers[senderUID].buffer.Add(new BufferedCandidate{media = media, index = index, name = name});
-		}
-	}
-
-	public void _IceCandidateCreated(String media, int index, String name, int uid)
-	{
-		if((bool)RTCMP.GetPeer(uid)["connected"])
-			this.RpcId(uid,"AddIceCandidate", RTCMP.GetUniqueId(), media, index, name);
-		//we don't need to check connectivity  for the relay
-		//because peers only get added to peerRelays when ["connected"] is true.
-		else if (peerRelays.ContainsKey(uid))
-		{
-			this.RpcId(peerRelays[uid].uid,"RelayIceCandidate", RTCMP.GetUniqueId(), media, index, name, uid);
-		}
-		GD.Print("NETWORKING ICE CANDIDATE CREATED");
-	}
-
-
-	[Remote]
-	public void RelayIceCandidate( int senderUID, string media, int index, string name, int uid)
-	{
-		GD.Print("NETWORKING ICE CANDIDATE RELAYED");
-		this.RpcId(uid,"AddIceCandidate", senderUID, media, index, name);
+		foreach( int k in SignaledPeers.Keys)
+			GD.Print(k);
+		var peer = SignaledPeers[senderUID];
+		peer.BufferIceCandidate(media, index, name);
+		
 	}
 	#endregion
 
@@ -273,13 +177,12 @@ public class Networking : Node
 		foreach(int uid in newPeers)
 		{
 			//add them if we don't already have them.
-			if (!RTCMP.HasPeer(uid) && !(uid == RTCMP.GetUniqueId()))
+			if (!SignaledPeers.ContainsKey(uid) && !(uid == RTCMP.GetUniqueId()))
 			{
 				GD.Print("ADDING THIS PEER: ", uid);
-				WebRTCPeerConnection newPeer = this.AddPeer(this, uid);
-				//Immediately create the offer since we're the ones offering.
-				newPeer.CreateOffer();
-				peerRelays.Add(uid, new Relay(referrer,true));
+				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer, true);
+				SignaledPeers.Add(uid, newPeer);
+				UnsearchedPeers.Add(uid);
 			}
 		}
 	}
@@ -293,13 +196,14 @@ public class Networking : Node
 		int requester = GetTree().GetRpcSenderId();
 		
 		GD.Print("Getting peers for: ", requester);
-		GD.Print(RTCMP.GetPeers().Keys);
+		foreach( var key in SignaledPeers.Keys)
+			GD.Print(key);
 		
 		//maybe there's a way to cast non-generic collections
 		//to generic collections?
 		//For now this will have to do.
 		List<int> peerList = new List<int>();
-		foreach( int uid in RTCMP.GetPeers().Keys)
+		foreach( int uid in SignaledPeers.Keys)
 			peerList.Add(uid);
 		
 		byte[] packet = MessagePackSerializer.Serialize(peerList);
@@ -316,66 +220,38 @@ public class Networking : Node
 	}
 	#endregion
 
-	#region TIMEOUT TRACKING
-	public void OnPeerConnected(int uid)
+	public void LaunchPing(object source, System.Timers.ElapsedEventArgs e)
 	{
-		connectivityTracker.Add(uid, DateTime.Now);
-	}
-
-	public void CheckTimeout(object source, System.Timers.ElapsedEventArgs e)
-	{
-		//First ping everyone else, since this might as well happen 1 time a second too.
 		Rpc("Ping");
-
-		//For peers that previously connected to us, we check their status
-		ArrayList toClose = new ArrayList();
-		DateTime cutoff = DateTime.Now.Subtract(TIMEOUT);
-		foreach(KeyValuePair<int, DateTime> kvp in connectivityTracker)
-		{
-			if(kvp.Value < cutoff)
-				toClose.Add(kvp.Key);
-		}
-
-		//If they've been disconnected for to long, we close the connection.
-		foreach(int uid in toClose)
-		{
-			GD.Print("removing due to timeout: ", uid);
-			var peer = (WebRTCPeerConnection) RTCMP.GetPeer(uid)["connection"];
-			peer.Close();
-			RTCMP.RemovePeer(uid);
-			connectivityTracker.Remove(uid);
-		}
 	}
+
 	[Remote]
 	public void Ping()
 	{
-		//GD.Print("Got Ping");
-		connectivityTracker[GetTree().GetRpcSenderId()] = System.DateTime.Now;
+		SignaledPeers[GetTree().GetRpcSenderId()].LastPing = System.DateTime.Now;
 	}
-	#endregion
+
+
 	public override void _Process(float delta)
 	{
 
 		//For each peer in our dictionary mapping peers to relays
-		ArrayList toRemove = new ArrayList();
-		foreach( int uid in peerRelays.Keys)
+		List<int> toRemove = new List<int>();
+		foreach( int uid in UnsearchedPeers)
 		{
 			//check if they're connected.
-			if ( (bool)RTCMP.GetPeer(uid)["connected"])
+			if ( SignaledPeers[uid].currentState == SignaledPeer.ConnectionState.NOMINAL)
 			{
 				//if they are, then ask them for their peers
-				if(peerRelays[uid].askForPeers)
-					this.RpcId(uid,"GetPeerUIDs");
-	
+				this.RpcId(uid,"GetPeerUIDs");
 				//then remove them from the list.
 				toRemove.Add(uid);
-
 			}
 		}
 		
 		//and remove them from the dictionary.
 		foreach( int uid in toRemove)
-			peerRelays.Remove(uid);
+			UnsearchedPeers.Remove(uid);
 	}
 
 }

@@ -16,7 +16,7 @@ public class HandshakeClient : Node
     
     private Networking networking;
     public WebSocketClient WSClient = new WebSocketClient();
-    private WebRTCPeerConnection handshakePeer;
+    private SignaledPeer handshakePeer;
     private int handshakeCounterpart = -1;
     private string secret;
 
@@ -64,20 +64,12 @@ public class HandshakeClient : Node
         byte[] packet = WSClient.GetPeer(1).GetPacket();
         Dictionary<string, dynamic> data = MessagePackSerializer.Deserialize<Dictionary<string,dynamic>>(packet);
         
-        if(!(handshakePeer is null))
-            GD.Print(handshakePeer.GetConnectionState());
-        
         if(authenticated)
         {
             if(data["type"] == "answer")
-            {
                 handshakePeer.SetRemoteDescription( data["type"], data["sdp"]);
-                networking.ICEBuffers[handshakeCounterpart].SetRemote();
-            }
             else if(data["type"] == "iceCandidate")
-            {
-                networking.AddIceCandidate(handshakeCounterpart, data["media"], data["index"], data["name"] );
-            }
+                handshakePeer.BufferIceCandidate(data["media"], data["index"], data["name"] );   
         }
         else{
             if(data["type"] == "authentication" && data["status"] == "success")
@@ -96,8 +88,13 @@ public class HandshakeClient : Node
 
                 //create a peer and link it to us.
                 handshakeCounterpart = data["uid"];
-                handshakePeer = networking.AddPeer(this, data["uid"]);
-                handshakePeer.CreateOffer();
+                handshakePeer = new SignaledPeer(handshakeCounterpart, networking, SignaledPeer.ConnectionState.MANUAL, networking.PollTimer, false);
+                
+                handshakePeer.PeerConnection.Connect("session_description_created", this, "_OfferCreated", SignaledPeer.intToGArr(handshakeCounterpart));
+                handshakePeer.PeerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated",SignaledPeer.intToGArr(handshakeCounterpart));
+                
+                networking.SignaledPeers.Add(handshakeCounterpart, handshakePeer);
+                handshakePeer.PeerConnection.CreateOffer();
             }
         }   
     }
@@ -136,10 +133,8 @@ public class HandshakeClient : Node
     {
         GD.Print("_FinishHandshake");
         WSClient.DisconnectFromHost(reason:"Handshake Complete");
-        handshakePeer.Disconnect("session_description_created",this,"_OfferCreated");
-        handshakePeer.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
-        handshakePeer.Connect("session_description_created",networking,"_OfferCreated",networking.intToGArr(handshakeCounterpart));
-        handshakePeer.Connect("ice_candidate_created",networking,"_IceCandidateCreated",networking.intToGArr(handshakeCounterpart));
+        handshakePeer.PeerConnection.Disconnect("session_description_created",this,"_OfferCreated");
+        handshakePeer.PeerConnection.Disconnect("ice_candidate_created",this,"_IceCandidateCreated");
         
         SetProcess(false); //Our job is done here.
         networking.StartPeerSearch(handshakeCounterpart);
@@ -148,7 +143,7 @@ public class HandshakeClient : Node
     public override void _Process(float delta)
     {
         WSClient.Poll();
-        if(!(handshakePeer is null) && (bool) networking.RTCMP.GetPeer(handshakeCounterpart)["connected"])
+        if(!(handshakePeer is null) && handshakePeer.currentState == SignaledPeer.ConnectionState.NOMINAL)
         {
             _FinishHandshake();
         }
