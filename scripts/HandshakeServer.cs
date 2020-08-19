@@ -153,14 +153,14 @@ public class HandshakeServer : Node
 
     private int GenUniqueID()
     {
-        int candidate = rnd.Next(1,2147483647);
+        int candidate = rnd.Next(1,UInt16.MaxValue);
 
         //will almost certainly never happen
         //but in case it does, this guarantees a unique ID if one is available.
         //(God help you if you're playing with 2 billion+ people and one isn't available.)
-        while(networking.RTCMP.HasPeer(candidate))
+        while(networking.RTCMP.HasPeer(UInt16.MaxValue))
         {
-            if(candidate==2147483647)
+            if(candidate==10)
                 candidate = 1;
             else
                 candidate++;
