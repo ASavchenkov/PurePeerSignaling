@@ -88,7 +88,7 @@ public class HandshakeClient : Node
 
                 //create a peer and link it to us.
                 handshakeCounterpart = data["uid"];
-                handshakePeer = new SignaledPeer(handshakeCounterpart, networking, SignaledPeer.ConnectionState.MANUAL, networking.PollTimer, false);
+                handshakePeer = new SignaledPeer(handshakeCounterpart, networking, SignaledPeer.ConnectionStateMachine.MANUAL, networking.PollTimer, false);
                 
                 handshakePeer.PeerConnection.Connect("session_description_created", this, "_OfferCreated", SignaledPeer.intToGArr(handshakeCounterpart));
                 handshakePeer.PeerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated",SignaledPeer.intToGArr(handshakeCounterpart));
@@ -143,7 +143,7 @@ public class HandshakeClient : Node
     public override void _Process(float delta)
     {
         WSClient.Poll();
-        if(!(handshakePeer is null) && handshakePeer.currentState == SignaledPeer.ConnectionState.NOMINAL)
+        if(!(handshakePeer is null) && handshakePeer.currentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
         {
             _FinishHandshake();
         }

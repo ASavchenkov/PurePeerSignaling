@@ -16,6 +16,8 @@ Overall mode of operation:
 	We request a list of all peers they're connected to.
 	We call RPCs through them to relay signaling info to these peers
 	We then ask those peers for their peers until we have connected to everyone.
+
+3) We handle reconnects/timeouts in here.
 */
 
 public class Networking : Node
@@ -93,7 +95,7 @@ public class Networking : Node
 	[Remote]
 	public void CheckRelay(int uid)
 	{
-		if (SignaledPeers[uid].currentState == SignaledPeer.ConnectionState.NOMINAL)
+		if (SignaledPeers[uid].currentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
 			RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
 	}
 
@@ -130,7 +132,7 @@ public class Networking : Node
 			else
 			{
 				GD.Print("NEW OFFER");
-				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer, false);
+				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, PollTimer, false);
 				SignaledPeers.Add(uid,peer);
 			}
 			peer.RelayConfirmed(GetTree().GetRpcSenderId());
@@ -180,7 +182,7 @@ public class Networking : Node
 			if (!SignaledPeers.ContainsKey(uid) && !(uid == RTCMP.GetUniqueId()))
 			{
 				GD.Print("ADDING THIS PEER: ", uid);
-				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionState.RELAY_SEARCH, PollTimer, true);
+				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, PollTimer, true);
 				SignaledPeers.Add(uid, newPeer);
 				UnsearchedPeers.Add(uid);
 			}
@@ -231,6 +233,12 @@ public class Networking : Node
 		SignaledPeers[GetTree().GetRpcSenderId()].LastPing = System.DateTime.Now;
 	}
 
+	[RemoteSync]
+	public void VoteDC(int uid, bool vote)
+	{
+		SignaledPeers[uid].DCVotes[GetTree().GetRpcSenderId()] = vote;
+	}
+
 
 	public override void _Process(float delta)
 	{
@@ -240,7 +248,7 @@ public class Networking : Node
 		foreach( int uid in UnsearchedPeers)
 		{
 			//check if they're connected.
-			if ( SignaledPeers[uid].currentState == SignaledPeer.ConnectionState.NOMINAL)
+			if ( SignaledPeers[uid].currentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
 			{
 				//if they are, then ask them for their peers
 				this.RpcId(uid,"GetPeerUIDs");

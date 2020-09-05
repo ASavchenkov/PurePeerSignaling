@@ -39,13 +39,18 @@ public class SignaledPeer : Godot.Object
     public bool localReady = false;
     public bool AskForPeers = true;
 
-    public static TimeSpan ANNOUNCE_TIME = new TimeSpan(0,0,3);
+    public static TimeSpan VOTE_TIME = new TimeSpan(0,0,3);
     public static TimeSpan RESET_TIME = new TimeSpan(0,0,6);
     public DateTime LastPing;
 
-    public enum ConnectionState { NOMINAL, RELAY, RELAY_SEARCH, MANUAL};
-    public ConnectionState currentState;
+    public enum ConnectionStateMachine { NOMINAL, RELAY, RELAY_SEARCH, MANUAL};
+    public ConnectionStateMachine currentState;
     System.Timers.Timer pollTimer;
+
+    //Keeps track of collective decision making to DC peers.
+    //(Generally if they fail to ping due to game crash/network failure/etc.)
+    //These votes include one for our peer, and is kept track of the same way.
+    public Dictionary<int, bool> DCVotes = new Dictionary<int, bool>();
 
     private bool initiator = false;
 
@@ -67,7 +72,7 @@ public class SignaledPeer : Godot.Object
 
     //Networking is basically a singleton.
     //(Just poorly implemented).
-    public SignaledPeer(int _UID, Networking networking, ConnectionState startingState, System.Timers.Timer _pollTimer, bool _initiator)
+    public SignaledPeer(int _UID, Networking networking, ConnectionStateMachine startingState, System.Timers.Timer _pollTimer, bool _initiator)
     {
         UID = _UID;
         this.networking = networking;
@@ -92,7 +97,7 @@ public class SignaledPeer : Godot.Object
         PeerConnection.Close();
         PeerConnection.Initialize(RTCInitializer);
         LastPing = DateTime.Now;
-        currentState = ConnectionState.RELAY_SEARCH;
+        currentState = ConnectionStateMachine.RELAY_SEARCH;
         GD.Print("RESET CONNECTION");
         Poll();
     }
@@ -119,7 +124,7 @@ public class SignaledPeer : Godot.Object
     public void _OfferCreated(string type, string sdp)
     {
         SetLocalDescription(type,sdp);
-        if(currentState == ConnectionState.RELAY)
+        if(currentState == ConnectionStateMachine.RELAY)
             networking.RpcId(relayUID, "RelayOffer", UID, type, sdp);
         GD.Print("OFFER CREATED: ", type); 
     }
@@ -128,10 +133,10 @@ public class SignaledPeer : Godot.Object
     {
         switch(currentState)
         {
-            case ConnectionState.NOMINAL:
+            case ConnectionStateMachine.NOMINAL:
                 networking.RpcId(UID, "AddIceCandidate", networking.GetTree().GetNetworkUniqueId(), media, index, name);
                 break;
-            case ConnectionState.RELAY:
+            case ConnectionStateMachine.RELAY:
                 networking.RpcId(relayUID,"RelayIceCandidate",media, index, name, UID);
                 break;
             default:
@@ -143,7 +148,7 @@ public class SignaledPeer : Godot.Object
     private void ShuffleRelayCandidates()
     {
         Random r = new Random();
-        IEnumerable<int> filtered = networking.SignaledPeers.Keys.Where(uid => networking.SignaledPeers[uid].currentState == ConnectionState.NOMINAL);
+        IEnumerable<int> filtered = networking.SignaledPeers.Keys.Where(uid => networking.SignaledPeers[uid].currentState == ConnectionStateMachine.NOMINAL);
         relayCandidates = new Queue<int>(filtered.OrderBy(x => x));
         GD.Print("ShuffleRelayCandidates: ", relayCandidates.Count);
     }
@@ -173,9 +178,9 @@ public class SignaledPeer : Godot.Object
 
     public void RelayLost()
     {
-        if(currentState == ConnectionState.RELAY)
+        if(currentState == ConnectionStateMachine.RELAY)
         {
-            currentState = ConnectionState.RELAY_SEARCH;
+            currentState = ConnectionStateMachine.RELAY_SEARCH;
             Poll();
         }
     }
@@ -190,7 +195,7 @@ public class SignaledPeer : Godot.Object
     public void RelayConfirmed(int uid)
     {
         //If someone gets back to us late, we ignore them.
-        if(currentState == ConnectionState.RELAY_SEARCH)
+        if(currentState == ConnectionStateMachine.RELAY_SEARCH)
         {
             
             if(networking.SignaledPeers.ContainsKey(relayUID))
@@ -201,12 +206,13 @@ public class SignaledPeer : Godot.Object
             if(initiator)
                 PeerConnection.CreateOffer();
 
-            currentState = ConnectionState.RELAY;
+            currentState = ConnectionStateMachine.RELAY;
             GD.Print("RELAY CONFIRMED");
             Poll();
         }
         
     }
+
 
     public void Poll(object source, System.Timers.ElapsedEventArgs e)
     {
@@ -215,13 +221,17 @@ public class SignaledPeer : Godot.Object
 
     public void Poll()
     {
-        GD.Print(UID, " ", currentState);
+
         switch(currentState)
         {
-            case ConnectionState.NOMINAL:
-                if(RESET_TIME < (DateTime.Now - LastPing))
+            case ConnectionStateMachine.NOMINAL:
+
+                if(!DCVotes[networking.RTCMP.GetUniqueId()] && VOTE_TIME < (DateTime.Now - LastPing))
+                    networking.Rpc("VoteDC", UID, true);
+                
+                if(RESET_TIME < (DateTime.Now - LastPing) || PeerConnection.GetConnectionState()==WebRTCPeerConnection.ConnectionState.Closed)
                 {
-                    GD.Print("resetting: ", (DateTime.Now - LastPing));
+
                     PeerConnection.Close();
                     PeerConnection.Initialize(RTCInitializer);
                     remoteReady = false;
@@ -229,11 +239,10 @@ public class SignaledPeer : Godot.Object
                     buffer = new List<BufferedCandidate>();
                     ShuffleRelayCandidates();
                     EmitSignal("ConnectionLost");
-                    currentState = ConnectionState.RELAY_SEARCH;
+                    currentState = ConnectionStateMachine.RELAY_SEARCH;
                 }
                 break;
-            case ConnectionState.RELAY_SEARCH:
-            GD.Print("yup relay search");
+            case ConnectionStateMachine.RELAY_SEARCH:
                 if(relayCandidates.Count == 0)
                     ShuffleRelayCandidates();
                 //If it's still zero, then there's no relay candidates
@@ -247,15 +256,21 @@ public class SignaledPeer : Godot.Object
                 break;
         }
 
-        if((bool)networking.RTCMP.GetPeer(UID)["connected"] && currentState != ConnectionState.NOMINAL)
+        if((bool)networking.RTCMP.GetPeer(UID)["connected"] && currentState != ConnectionStateMachine.NOMINAL)
         {
 
             if(networking.SignaledPeers.ContainsKey(relayUID))
                 TryDisconnect(networking.SignaledPeers[relayUID], "ConnectionLost", this, "RelayLost");
             LastPing = DateTime.Now;
-            currentState = ConnectionState.NOMINAL;
+            currentState = ConnectionStateMachine.NOMINAL;
+            networking.Rpc("VoteDC", UID, false);
+            
         }
 
+        //If enough others have voted to DC this peer, DC immediately.
+        //Integer math is fine here, since the threshold is an integer anyways.
+        if(DCVotes.Values.Sum(x => x ? 1 : 0) > networking.SignaledPeers.Count*2/3)
+            networking.SignaledPeers.Remove(UID);
 
     }
 

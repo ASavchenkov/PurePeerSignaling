@@ -195,7 +195,7 @@ public class HandshakeServer : Node
                 int newUID = GenUniqueID();
                 WSPeers[id].uid = newUID;
                 
-                SignaledPeer newPeer = new SignaledPeer(newUID, networking, SignaledPeer.ConnectionState.MANUAL, networking.PollTimer, false);
+                SignaledPeer newPeer = new SignaledPeer(newUID, networking, SignaledPeer.ConnectionStateMachine.MANUAL, networking.PollTimer, false);
                 networking.SignaledPeers.Add(newUID, newPeer);
                 newPeer.PeerConnection.Connect("session_description_created", this, "_OfferCreated", SignaledPeer.intToGArr(newUID));
                 newPeer.PeerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated",SignaledPeer.intToGArr(newUID));
