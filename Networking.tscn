@@ -12,3 +12,5 @@ script = ExtResource( 2 )
 
 [node name="HandshakeClient" type="Node" parent="."]
 script = ExtResource( 3 )
+
+[node name="SlushNodes" type="Node" parent="."]

@@ -23,8 +23,8 @@ public class SlushNode : Node
     //Caches votes.
     private class NodeStatus
     {
-        public bool proposal;
-        public bool consensus;
+        public bool proposal = false;
+        public bool consensus = false;
         public SignaledPeer peer;
         public NodeStatus(SignaledPeer peer)
         {
@@ -49,14 +49,14 @@ public class SlushNode : Node
         This means that you need a larger sample size, since even after consensus is reached,
         it is possible to sample a subset of nodes with proposals outweighing consensus.
     */
-    private bool consensus = false; //What we currently believe to be the consensus.
-    public int multiplier = 2; //How much weight should we give the proposal compared to the consensus?
+    public bool consensus { get; private set;} = false; //What we currently believe to be the consensus.
+    public readonly int multiplier = 2; //How much weight should we give the proposal compared to the consensus?
     
-    private int confidence0 = 0; //Confidence counters.
-    private int confidence1 = 0;
+    public int confidence0 { get; private set;} = 0; //Confidence counters.
+    public int confidence1 { get; private set;} = 0;
     
     Networking networking;
-    System.Timers.Timer pollTimer = new System.Timers.Timer(1000);
+    System.Timers.Timer pollTimer = new System.Timers.Timer(500);
 
     [Remote]
     private void UpdateNodeStatus(bool proposal, bool consensus)
@@ -116,8 +116,16 @@ public class SlushNode : Node
             confidence1+=1;
         }
         confidence0 = Clamp(confidence0,0,10);
-        confidence1 = Clamp(confidence0,0,10);
+        confidence1 = Clamp(confidence1,0,10);
         #endregion
+    }
+
+    //Peers that aren't connected to us definitely don't have a vote.
+    public void RemovePeer(int uid)
+    {
+        GD.Print("Removing Peer");
+        if(nodes.ContainsKey(uid))
+            nodes.Remove(uid);
     }
 
     public override void _Ready()
@@ -126,7 +134,7 @@ public class SlushNode : Node
         pollTimer.AutoReset = true;
         pollTimer.Start();
         pollTimer.Elapsed+=poll;
-        
+        networking.RTCMP.Connect("peer_disconnected",this, "RemovePeer");
     }
 
 //  // Called every frame. 'delta' is the elapsed time since the previous frame.

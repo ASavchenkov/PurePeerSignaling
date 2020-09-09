@@ -42,15 +42,11 @@ public class SignaledPeer : Godot.Object
     public static TimeSpan VOTE_TIME = new TimeSpan(0,0,3);
     public static TimeSpan RESET_TIME = new TimeSpan(0,0,6);
     public DateTime LastPing;
+    private SlushNode slushNode;
 
     public enum ConnectionStateMachine { NOMINAL, RELAY, RELAY_SEARCH, MANUAL};
     public ConnectionStateMachine currentState;
     System.Timers.Timer pollTimer;
-
-    //Keeps track of collective decision making to DC peers.
-    //(Generally if they fail to ping due to game crash/network failure/etc.)
-    //These votes include one for our peer, and is kept track of the same way.
-    public Dictionary<int, bool> DCVotes = new Dictionary<int, bool>();
 
     private bool initiator = false;
 
@@ -64,7 +60,7 @@ public class SignaledPeer : Godot.Object
 		RTCInitializer.Add("iceServers", stunServerDict);
     }
 
-    //Please never call this.
+    //PLEASE NEVER CALL THIS.
     //Godot has a known issue with not having parameterless constructors.
     public SignaledPeer()
     {
@@ -79,7 +75,7 @@ public class SignaledPeer : Godot.Object
         currentState = startingState;
         initiator = _initiator;
         pollTimer = _pollTimer;
-        pollTimer.Elapsed+= this.Poll;
+        pollTimer.Elapsed+= Poll;
 
         PeerConnection = new WebRTCPeerConnection();
         PeerConnection.Connect("session_description_created", this, "_OfferCreated");
@@ -87,6 +83,13 @@ public class SignaledPeer : Godot.Object
         
         PeerConnection.Initialize(RTCInitializer);
         networking.RTCMP.AddPeer(PeerConnection, UID);
+
+        //Setting up the voting mechanism.
+        PackedScene slushScene = GD.Load<PackedScene>("res://addons/PurePeerSignaling/SlushNode.tscn");
+        slushNode = (SlushNode) slushScene.Instance();
+        slushNode.Name = UID.ToString();
+        networking.GetNode("SlushNodes").AddChild(slushNode);
+        slushNode.proposal = false;
         
         LastPing = DateTime.Now;
         GD.Print("SIGNALED PEER CONSTRUCTOR");
@@ -222,16 +225,29 @@ public class SignaledPeer : Godot.Object
     public void Poll()
     {
 
+        if(VOTE_TIME < (DateTime.Now - LastPing))
+            slushNode.proposal = true;
+        else
+            slushNode.proposal = false;
+
+        //If enough others have voted to DC this peer, DC immediately.
+        //Integer math is fine here, since the threshold is an integer anyways.
+        GD.Print("Votes: ", slushNode.consensus, slushNode.confidence1);
+        if(slushNode.consensus && slushNode.confidence1 == 10)
+        {
+            GD.Print("GOODBYE :(");
+            pollTimer.Stop();
+            networking.SignaledPeers.Remove(UID);
+            slushNode.QueueFree();
+        }
+
+
         switch(currentState)
         {
             case ConnectionStateMachine.NOMINAL:
 
-                if(!DCVotes[networking.RTCMP.GetUniqueId()] && VOTE_TIME < (DateTime.Now - LastPing))
-                    networking.Rpc("VoteDC", UID, true);
-                
                 if(RESET_TIME < (DateTime.Now - LastPing) || PeerConnection.GetConnectionState()==WebRTCPeerConnection.ConnectionState.Closed)
                 {
-
                     PeerConnection.Close();
                     PeerConnection.Initialize(RTCInitializer);
                     remoteReady = false;
@@ -256,21 +272,15 @@ public class SignaledPeer : Godot.Object
                 break;
         }
 
-        if((bool)networking.RTCMP.GetPeer(UID)["connected"] && currentState != ConnectionStateMachine.NOMINAL)
+        if(networking.RTCMP.HasPeer(UID) && (bool)networking.RTCMP.GetPeer(UID)["connected"] && currentState != ConnectionStateMachine.NOMINAL)
         {
 
             if(networking.SignaledPeers.ContainsKey(relayUID))
                 TryDisconnect(networking.SignaledPeers[relayUID], "ConnectionLost", this, "RelayLost");
             LastPing = DateTime.Now;
             currentState = ConnectionStateMachine.NOMINAL;
-            networking.Rpc("VoteDC", UID, false);
             
         }
-
-        //If enough others have voted to DC this peer, DC immediately.
-        //Integer math is fine here, since the threshold is an integer anyways.
-        if(DCVotes.Values.Sum(x => x ? 1 : 0) > networking.SignaledPeers.Count*2/3)
-            networking.SignaledPeers.Remove(UID);
 
     }
 
@@ -279,8 +289,13 @@ public class SignaledPeer : Godot.Object
     ~SignaledPeer()
     {
         try{
-        PeerConnection.Close();
-        networking.RTCMP.RemovePeer(UID);
+            PeerConnection.Close();
+        }catch(Exception e)
+        {
+            GD.Print(e.ToString());
+        }
+        try{
+            slushNode.QueueFree();
         }catch(Exception e)
         {
             GD.Print(e.ToString());

@@ -233,12 +233,6 @@ public class Networking : Node
 		SignaledPeers[GetTree().GetRpcSenderId()].LastPing = System.DateTime.Now;
 	}
 
-	[RemoteSync]
-	public void VoteDC(int uid, bool vote)
-	{
-		SignaledPeers[uid].DCVotes[GetTree().GetRpcSenderId()] = vote;
-	}
-
 
 	public override void _Process(float delta)
 	{
