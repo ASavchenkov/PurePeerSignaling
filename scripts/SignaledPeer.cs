@@ -232,7 +232,7 @@ public class SignaledPeer : Godot.Object
 
         //If enough others have voted to DC this peer, DC immediately.
         //Integer math is fine here, since the threshold is an integer anyways.
-        GD.Print("Votes: ", slushNode.consensus, slushNode.confidence1);
+        GD.Print("Votes: ", slushNode.consensus, slushNode.confidence0, slushNode.confidence1);
         if(slushNode.consensus && slushNode.confidence1 == 10)
         {
             GD.Print("GOODBYE :(");
@@ -272,9 +272,8 @@ public class SignaledPeer : Godot.Object
                 break;
         }
 
-        if(networking.RTCMP.HasPeer(UID) && (bool)networking.RTCMP.GetPeer(UID)["connected"] && currentState != ConnectionStateMachine.NOMINAL)
+        if(networking.RTCMP.HasPeer(UID) && PeerConnection.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected && currentState != ConnectionStateMachine.NOMINAL)
         {
-
             if(networking.SignaledPeers.ContainsKey(relayUID))
                 TryDisconnect(networking.SignaledPeers[relayUID], "ConnectionLost", this, "RelayLost");
             LastPing = DateTime.Now;

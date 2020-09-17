@@ -112,8 +112,8 @@ public class SlushNode : Node
         }
         else
         {
-            confidence0-=2;
-            confidence1+=1;
+            confidence0+=1;
+            confidence1-=2;
         }
         confidence0 = Clamp(confidence0,0,10);
         confidence1 = Clamp(confidence1,0,10);
