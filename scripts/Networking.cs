@@ -25,7 +25,6 @@ public class Networking : Node
 
 	[Signal]
 	public delegate void ConnectedToSession(int uid);
-
 	
 	public WebRTCMultiplayer RTCMP = new WebRTCMultiplayer();
 	public Dictionary<int, SignaledPeer> SignaledPeers = new Dictionary<int, SignaledPeer>();
