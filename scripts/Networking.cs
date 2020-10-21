@@ -25,27 +25,23 @@ public class Networking : Node
 
 	[Signal]
 	public delegate void ConnectedToSession(int uid);
+
+	[Signal]
+	public delegate void Peeradded(SignaledPeer peer);
 	
 	public WebRTCMultiplayer RTCMP = new WebRTCMultiplayer();
 	public Dictionary<int, SignaledPeer> SignaledPeers = new Dictionary<int, SignaledPeer>();
-	
-	HandshakeServer handshakeServer;
-	HandshakeClient handshakeClient;
-
-	string url = "ws://192.168.1.143:3476";
-	string secret = "secret";
 
 	public System.Timers.Timer PollTimer = new System.Timers.Timer(1000);
 
 	private List<int> UnsearchedPeers = new List<int>();
 	
+	private Random rnd = new Random();
+
 	#region SETUP
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
-		GD.Print("Running Ready");
-		handshakeServer = (HandshakeServer) GetNode("HandshakeServer");
-		handshakeClient = (HandshakeClient) GetNode("HandshakeClient");
 		
 		RTCMP.Initialize(1,false);
 		GetTree().NetworkPeer = RTCMP;
@@ -56,37 +52,50 @@ public class Networking : Node
 
 	}
 	
-	public void _SetURL(string url)
-	{
-		this.url = url;
-	}
 
-	public void _SetSecret(string secret)
-	{
-		this.secret = secret;
-	}
-
-	public void _JoinMesh()
+	public void JoinMesh(byte[] packet)
 	{
 		GD.Print("_JoinMesh");
 		//first you need to remove yourself from the current mesh.
 		RTCMP.Close();
 		SignaledPeers = new Dictionary<int, SignaledPeer>();
-		//and stop your handshakeServer if you have one running.
-		handshakeServer._StopServer();
-		//Then tell the handshakeClient to do the handshake.
-		handshakeClient.Handshake(url, secret);
-	}
+		
+		Dictionary<string, dynamic> data = MessagePackSerializer.Deserialize<Dictionary<string,dynamic>>(packet);
+		
+		RTCMP.Initialize(data["assignedUID"]);
+		
+		var handshakePeer = new SignaledPeer(data["uid"], this, SignaledPeer.ConnectionStateMachine.MANUAL, this.PollTimer, false);
+		handshakePeer.PeerConnection.SetRemoteDescription(data["offerType"], data["offerSDP"]);
 
-	public void _StartServer()
-	{
-		handshakeServer._StartServer(secret);
-	}
-	public void _StopServer()
-	{
-		handshakeServer._StopServer();
 	}
 	
+	#endregion
+
+	#region MANUAL SIGNALING
+
+	private int GenUniqueID()
+    {
+        int candidate = rnd.Next(1,UInt16.MaxValue);
+
+        //will almost certainly never happen
+        //but in case it does, this guarantees a unique ID if one is available.
+        //(God help you if you're playing with 2 billion+ people and one isn't available.)
+        while(RTCMP.HasPeer(UInt16.MaxValue))
+        {
+            if(candidate==10)
+                candidate = 1;
+            else
+                candidate++;
+        }
+        return candidate;
+    }
+
+	public void ManualAddPeer()
+	{
+		var newPeer = new SignaledPeer(GenUniqueID(), this, SignaledPeer.ConnectionStateMachine.MANUAL, PollTimer, false);
+		newPeer.PeerConnection.CreateOffer();
+	}
+
 	#endregion
 
 	#region SIGNALING
@@ -98,7 +107,6 @@ public class Networking : Node
 			RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
 	}
 
-	
 	[Remote]
 	public void RelayConfirmed(int uid)
 	{
@@ -132,7 +140,7 @@ public class Networking : Node
 			{
 				GD.Print("NEW OFFER");
 				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, PollTimer, false);
-				SignaledPeers.Add(uid,peer);
+				
 			}
 			peer.RelayConfirmed(GetTree().GetRpcSenderId());
 			
@@ -182,7 +190,6 @@ public class Networking : Node
 			{
 				GD.Print("ADDING THIS PEER: ", uid);
 				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, PollTimer, true);
-				SignaledPeers.Add(uid, newPeer);
 				UnsearchedPeers.Add(uid);
 			}
 		}

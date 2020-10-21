@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MessagePack;
 /*
 TL;DR Poor Mans Polymorphism
 
@@ -18,8 +19,15 @@ public class SignaledPeer : Godot.Object
 		return new Godot.Collections.Array(new int[] {input});
 	}
 
+    [MessagePackObject(keyAsPropertyName:true)]
     public struct BufferedCandidate
 	{
+        public BufferedCandidate(string _media, int _index, string _name)
+        {
+            media = _media;
+            index = _index;
+            name = _name;
+        }
 		public string media;
 		public int index;
 		public string name;
@@ -28,6 +36,12 @@ public class SignaledPeer : Godot.Object
     [Signal]
     public delegate void ConnectionLost();
 
+    [Signal]
+    public delegate void BufferedOfferUpdated(byte[] packet);
+
+    [Signal]
+    public delegate void StatusUpdated(ConnectionStateMachine currentState);
+
     int UID;
     static Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
     public WebRTCPeerConnection PeerConnection;
@@ -35,9 +49,9 @@ public class SignaledPeer : Godot.Object
     List<BufferedCandidate> buffer = new List<BufferedCandidate>();
 
     public int relayUID;
-    public bool remoteReady = false;
-    public bool localReady = false;
-    public bool AskForPeers = true;
+    private bool remoteReady = false;
+    private bool localReady = false;
+    private bool AskForPeers = true;
 
     public static TimeSpan VOTE_TIME = new TimeSpan(0,0,3);
     public static TimeSpan RESET_TIME = new TimeSpan(0,0,6);
@@ -51,6 +65,26 @@ public class SignaledPeer : Godot.Object
     private bool initiator = false;
 
     private Queue<int> relayCandidates = new Queue<int>();
+
+    [MessagePackObject(keyAsPropertyName: true)]
+    private class Offer
+    {
+
+        public int UID;
+        public int assignedUID = -1; //Will be -1 if this is a response.
+        public string type;
+        public string sdp;
+        public List<BufferedCandidate> ICECandidates;
+
+        public Offer(int _UID, int _assignedUID, string _type, string _sdp)
+        {
+            UID = _UID;
+            assignedUID = _assignedUID;
+            type = _type;
+            sdp = _sdp;
+        }
+    }
+    private Offer BufferedOffer;
 
     static SignaledPeer()
     {
@@ -83,7 +117,9 @@ public class SignaledPeer : Godot.Object
         
         PeerConnection.Initialize(RTCInitializer);
         networking.RTCMP.AddPeer(PeerConnection, UID);
-
+        networking.SignaledPeers.Add(this.UID, this);
+        networking.EmitSignal(nameof(Networking.Peeradded), this);
+        
         //Setting up the voting mechanism.
         PackedScene slushScene = GD.Load<PackedScene>("res://addons/PurePeerSignaling/SlushNode.tscn");
         slushNode = (SlushNode) slushScene.Instance();
@@ -129,6 +165,12 @@ public class SignaledPeer : Godot.Object
         SetLocalDescription(type,sdp);
         if(currentState == ConnectionStateMachine.RELAY)
             networking.RpcId(relayUID, "RelayOffer", UID, type, sdp);
+        else if(currentState == ConnectionStateMachine.MANUAL)
+        {
+            BufferedOffer = new Offer(networking.RTCMP.GetUniqueId(), UID, type, sdp);
+            EmitSignal(nameof(BufferedOfferUpdated),MessagePackSerializer.Serialize(BufferedOffer));
+        }
+
         GD.Print("OFFER CREATED: ", type); 
     }
 
@@ -141,6 +183,9 @@ public class SignaledPeer : Godot.Object
                 break;
             case ConnectionStateMachine.RELAY:
                 networking.RpcId(relayUID,"RelayIceCandidate",media, index, name, UID);
+                break;
+            case ConnectionStateMachine.MANUAL:
+                BufferedOffer.ICECandidates.Add(new BufferedCandidate(media, index, name));
                 break;
             default:
                 GD.Print("ICE GENERATION IGNORED");

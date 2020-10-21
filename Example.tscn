@@ -1,109 +1,101 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=5 format=2]
 
 [ext_resource path="res://addons/PurePeerSignaling/Networking.tscn" type="PackedScene" id=1]
-[ext_resource path="res://addons/PurePeerSignaling/Example.cs" type="Script" id=2]
+[ext_resource path="res://addons/PurePeerSignaling/PeerItem.tscn" type="PackedScene" id=2]
+[ext_resource path="res://addons/PurePeerSignaling/scripts/GUI/IDDisplay.cs" type="Script" id=3]
+[ext_resource path="res://addons/PurePeerSignaling/scripts/GUI/PeerList.cs" type="Script" id=4]
 
 [node name="GameRoot" type="Spatial"]
-script = ExtResource( 2 )
-
-[node name="UI" type="Control" parent="."]
-margin_left = 32.094
-margin_top = 11.3327
-margin_right = 1042.09
-margin_bottom = 599.333
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="RichTextLabel" type="RichTextLabel" parent="UI"]
-margin_left = 310.0
-margin_top = 243.0
-margin_right = 707.0
-margin_bottom = 323.0
-text = "Clear Mesh clears all WebRTCPeerConnections, and disconnects all WebSocket peer connections. It also re-initializes the dictionary of peers."
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="Buttons" type="GridContainer" parent="UI"]
-margin_left = 397.0
-margin_top = 141.0
-margin_right = 560.0
-margin_bottom = 215.0
-columns = 2
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="JoinMesh" type="Button" parent="UI/Buttons"]
-margin_right = 77.0
-margin_bottom = 20.0
-text = "Join Mesh"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="StartServer" type="Button" parent="UI/Buttons"]
-margin_left = 81.0
-margin_right = 166.0
-margin_bottom = 20.0
-text = "Start Server"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="DispPeers" type="Button" parent="UI/Buttons"]
-margin_top = 24.0
-margin_right = 77.0
-margin_bottom = 44.0
-text = "DispPeers"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="StopServer" type="Button" parent="UI/Buttons"]
-margin_left = 81.0
-margin_top = 24.0
-margin_right = 166.0
-margin_bottom = 44.0
-text = "Stop Server"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="PeerList" type="RichTextLabel" parent="UI"]
-margin_left = 328.0
-margin_top = 407.0
-margin_right = 619.0
-margin_bottom = 523.0
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="hostURL" type="LineEdit" parent="UI"]
-margin_left = 300.55
-margin_top = 345.45
-margin_right = 668.55
-margin_bottom = 369.45
-text = "ws://192.168.1.143:3476"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="secret" type="LineEdit" parent="UI"]
-margin_left = 298.65
-margin_top = 382.5
-margin_right = 666.65
-margin_bottom = 406.5
-text = "secret"
-__meta__ = {
-"_edit_use_anchors_": false
-}
 
 [node name="Networking" parent="." instance=ExtResource( 1 )]
-[connection signal="pressed" from="UI/Buttons/JoinMesh" to="Networking" method="_JoinMesh"]
-[connection signal="pressed" from="UI/Buttons/StartServer" to="Networking" method="_StartServer"]
-[connection signal="pressed" from="UI/Buttons/DispPeers" to="." method="_DispPeers"]
-[connection signal="pressed" from="UI/Buttons/StopServer" to="Networking" method="_StopServer"]
-[connection signal="text_changed" from="UI/hostURL" to="Networking" method="_SetURL"]
-[connection signal="text_changed" from="UI/secret" to="Networking" method="_SetSecret"]
+
+[node name="MainMenu" type="CenterContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TabContainer" type="TabContainer" parent="MainMenu"]
+margin_left = 212.0
+margin_top = 50.0
+margin_right = 812.0
+margin_bottom = 550.0
+rect_min_size = Vector2( 600, 500 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Networking" type="CenterContainer" parent="MainMenu/TabContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Columns" type="HBoxContainer" parent="MainMenu/TabContainer/Networking"]
+margin_left = 171.0
+margin_top = 182.0
+margin_right = 421.0
+margin_bottom = 282.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MainMenu/TabContainer/Networking/Columns"]
+margin_right = 250.0
+margin_bottom = 100.0
+rect_min_size = Vector2( 250, 100 )
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="PanelContainer" type="PanelContainer" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer"]
+margin_right = 250.0
+margin_bottom = 28.0
+
+[node name="ID Data" type="HBoxContainer" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer/PanelContainer"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 21.0
+
+[node name="Current ID" type="Label" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer/PanelContainer/ID Data"]
+margin_right = 116.0
+margin_bottom = 14.0
+size_flags_horizontal = 3
+text = "Current ID:"
+
+[node name="ID String" type="Label" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer/PanelContainer/ID Data"]
+margin_left = 120.0
+margin_right = 236.0
+margin_bottom = 14.0
+size_flags_horizontal = 3
+text = "1"
+script = ExtResource( 3 )
+
+[node name="PanelContainer2" type="PanelContainer" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer"]
+margin_top = 32.0
+margin_right = 250.0
+margin_bottom = 100.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Peer Statuses" type="ScrollContainer" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer/PanelContainer2"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 61.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer/PanelContainer2/Peer Statuses"]
+margin_right = 236.0
+margin_bottom = 54.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource( 4 )
+
+[node name="PeerItem" parent="MainMenu/TabContainer/Networking/Columns/VBoxContainer/PanelContainer2/Peer Statuses/VBoxContainer" instance=ExtResource( 2 )]
+[connection signal="ConnectedToSession" from="Networking" to="MainMenu/TabContainer/Networking/Columns/VBoxContainer/PanelContainer/ID Data/ID String" method="OnIDUpdate"]
