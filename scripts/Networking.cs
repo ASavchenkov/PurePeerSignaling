@@ -27,7 +27,7 @@ public class Networking : Node
 	public delegate void ConnectedToSession(int uid);
 
 	[Signal]
-	public delegate void Peeradded(SignaledPeer peer);
+	public delegate void PeerAdded(SignaledPeer peer);
 	
 	public WebRTCMultiplayer RTCMP = new WebRTCMultiplayer();
 	public Dictionary<int, SignaledPeer> SignaledPeers = new Dictionary<int, SignaledPeer>();
@@ -37,6 +37,8 @@ public class Networking : Node
 	private List<int> UnsearchedPeers = new List<int>();
 	
 	private Random rnd = new Random();
+
+	private SignaledPeer HandshakePeer = null;
 
 	#region SETUP
 	// Called when the node enters the scene tree for the first time.
@@ -51,7 +53,16 @@ public class Networking : Node
 		PollTimer.Elapsed+=LaunchPing;
 
 	}
-	
+
+	public SignaledPeer CreateSignaledPeer(int _UID, SignaledPeer.ConnectionStateMachine startingState, bool _initiator)
+    {
+		var peer = new SignaledPeer(_UID, this, startingState, this.PollTimer, _initiator);
+		RTCMP.AddPeer(peer.PeerConnection, _UID);
+		SignaledPeers.Add(_UID, peer);
+		
+        EmitSignal(nameof(PeerAdded), peer);
+		return peer;
+	}
 
 	public void JoinMesh(byte[] packet)
 	{
@@ -60,12 +71,13 @@ public class Networking : Node
 		RTCMP.Close();
 		SignaledPeers = new Dictionary<int, SignaledPeer>();
 		
-		Dictionary<string, dynamic> data = MessagePackSerializer.Deserialize<Dictionary<string,dynamic>>(packet);
+		SignaledPeer.Offer incomingOffer = MessagePackSerializer.Deserialize<SignaledPeer.Offer>(packet);
 		
-		RTCMP.Initialize(data["assignedUID"]);
+		RTCMP.Initialize(incomingOffer.assignedUID);
 		
-		var handshakePeer = new SignaledPeer(data["uid"], this, SignaledPeer.ConnectionStateMachine.MANUAL, this.PollTimer, false);
-		handshakePeer.PeerConnection.SetRemoteDescription(data["offerType"], data["offerSDP"]);
+		HandshakePeer = CreateSignaledPeer(incomingOffer.UID, SignaledPeer.ConnectionStateMachine.MANUAL, false);
+		HandshakePeer.Connect(nameof(SignaledPeer.StatusUpdated),this,nameof(HandshakeStatusUpdated));
+		HandshakePeer.PeerConnection.SetRemoteDescription(incomingOffer.type, incomingOffer.sdp);
 
 	}
 	
@@ -90,10 +102,11 @@ public class Networking : Node
         return candidate;
     }
 
-	public void ManualAddPeer()
+	public SignaledPeer ManualAddPeer()
 	{
-		var newPeer = new SignaledPeer(GenUniqueID(), this, SignaledPeer.ConnectionStateMachine.MANUAL, PollTimer, false);
+		var newPeer = CreateSignaledPeer(GenUniqueID(), SignaledPeer.ConnectionStateMachine.MANUAL, false);
 		newPeer.PeerConnection.CreateOffer();
+		return newPeer;
 	}
 
 	#endregion
@@ -139,7 +152,7 @@ public class Networking : Node
 			else
 			{
 				GD.Print("NEW OFFER");
-				peer = new SignaledPeer(uid, this, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, PollTimer, false);
+				peer = CreateSignaledPeer(uid, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, false);
 				
 			}
 			peer.RelayConfirmed(GetTree().GetRpcSenderId());
@@ -189,7 +202,7 @@ public class Networking : Node
 			if (!SignaledPeers.ContainsKey(uid) && !(uid == RTCMP.GetUniqueId()))
 			{
 				GD.Print("ADDING THIS PEER: ", uid);
-				SignaledPeer newPeer = new SignaledPeer(uid, this, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, PollTimer, true);
+				SignaledPeer newPeer = CreateSignaledPeer(uid, SignaledPeer.ConnectionStateMachine.RELAY_SEARCH, true);
 				UnsearchedPeers.Add(uid);
 			}
 		}
@@ -219,13 +232,18 @@ public class Networking : Node
 		this.RpcId(requester,"AddPeers", packet);
 	}
 
-
-
-	//handshakeCounterpart is our first point of contact.
-	public void StartPeerSearch(int handshakeCounterpart)
+	//Start the discovery process.
+	public void HandshakeStatusUpdated(SignaledPeer.ConnectionStateMachine state)
 	{
-		this.RpcId(handshakeCounterpart,"GetPeerUIDs");
+		if(state == SignaledPeer.ConnectionStateMachine.NOMINAL)
+		{
+			this.RpcId(HandshakePeer.UID, nameof(GetPeerUIDs));
+			HandshakePeer = null;
+			//handshake peer no longer needs to be it's own variable.
+			//It's just one of the peers we have now.
+		}
 	}
+
 	#endregion
 
 	public void LaunchPing(object source, System.Timers.ElapsedEventArgs e)

@@ -22,27 +22,32 @@ public class SignaledPeer : Godot.Object
     [MessagePackObject(keyAsPropertyName:true)]
     public struct BufferedCandidate
 	{
-        public BufferedCandidate(string _media, int _index, string _name)
-        {
-            media = _media;
-            index = _index;
-            name = _name;
-        }
+        
 		public string media;
 		public int index;
 		public string name;
+
+        public BufferedCandidate(string media, int index, string name)
+        {
+            this.media = media;
+            this.index = index;
+            this.name = name;
+        }
 	}
 
     [Signal]
     public delegate void ConnectionLost();
 
     [Signal]
-    public delegate void BufferedOfferUpdated(byte[] packet);
+    public delegate void BufferedOfferUpdated(Offer bufferedOffer);
 
     [Signal]
     public delegate void StatusUpdated(ConnectionStateMachine currentState);
 
-    int UID;
+    [Signal]
+    public delegate void Delete(); 
+
+    public int UID {get; private set;}
     static Godot.Collections.Dictionary RTCInitializer = new Godot.Collections.Dictionary();
     public WebRTCPeerConnection PeerConnection;
     Networking networking;
@@ -67,24 +72,24 @@ public class SignaledPeer : Godot.Object
     private Queue<int> relayCandidates = new Queue<int>();
 
     [MessagePackObject(keyAsPropertyName: true)]
-    private class Offer
+    public class Offer : Godot.Object
     {
 
         public int UID;
         public int assignedUID = -1; //Will be -1 if this is a response.
         public string type;
         public string sdp;
-        public List<BufferedCandidate> ICECandidates;
+        public List<BufferedCandidate> ICECandidates = new List<BufferedCandidate>();
 
-        public Offer(int _UID, int _assignedUID, string _type, string _sdp)
+        public Offer(int UID, int assignedUID, string type, string sdp)
         {
-            UID = _UID;
-            assignedUID = _assignedUID;
-            type = _type;
-            sdp = _sdp;
+            this.UID = UID;
+            this.assignedUID = assignedUID;
+            this.type = type;
+            this.sdp = sdp;
         }
     }
-    private Offer BufferedOffer;
+    public Offer BufferedOffer {get; private set;}
 
     static SignaledPeer()
     {
@@ -116,9 +121,6 @@ public class SignaledPeer : Godot.Object
 	    PeerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated");
         
         PeerConnection.Initialize(RTCInitializer);
-        networking.RTCMP.AddPeer(PeerConnection, UID);
-        networking.SignaledPeers.Add(this.UID, this);
-        networking.EmitSignal(nameof(Networking.Peeradded), this);
         
         //Setting up the voting mechanism.
         PackedScene slushScene = GD.Load<PackedScene>("res://addons/PurePeerSignaling/SlushNode.tscn");
@@ -167,8 +169,9 @@ public class SignaledPeer : Godot.Object
             networking.RpcId(relayUID, "RelayOffer", UID, type, sdp);
         else if(currentState == ConnectionStateMachine.MANUAL)
         {
+            GD.Print("manual offer created");
             BufferedOffer = new Offer(networking.RTCMP.GetUniqueId(), UID, type, sdp);
-            EmitSignal(nameof(BufferedOfferUpdated),MessagePackSerializer.Serialize(BufferedOffer));
+            EmitSignal(nameof(BufferedOfferUpdated), BufferedOffer);
         }
 
         GD.Print("OFFER CREATED: ", type); 
@@ -186,6 +189,7 @@ public class SignaledPeer : Godot.Object
                 break;
             case ConnectionStateMachine.MANUAL:
                 BufferedOffer.ICECandidates.Add(new BufferedCandidate(media, index, name));
+                EmitSignal(nameof(BufferedOfferUpdated), BufferedOffer);
                 break;
             default:
                 GD.Print("ICE GENERATION IGNORED");
@@ -270,7 +274,7 @@ public class SignaledPeer : Godot.Object
     public void Poll()
     {
 
-        if(VOTE_TIME < (DateTime.Now - LastPing))
+        if(VOTE_TIME < (DateTime.Now - LastPing) && currentState != ConnectionStateMachine.MANUAL)
             slushNode.proposal = true;
         else
             slushNode.proposal = false;
@@ -344,5 +348,6 @@ public class SignaledPeer : Godot.Object
         {
             GD.Print(e.ToString());
         }
+        EmitSignal(nameof(Delete));
     }
 }

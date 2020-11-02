@@ -1,0 +1,211 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://addons/PurePeerSignaling/scripts/GUI/IDDisplay.cs" type="Script" id=3]
+[ext_resource path="res://addons/PurePeerSignaling/Scripts/GUI/NetworkingMenu.cs" type="Script" id=4]
+
+[node name="Networking" type="CenterContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource( 4 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Columns" type="HBoxContainer" parent="."]
+margin_left = 256.0
+margin_top = 132.0
+margin_right = 760.0
+margin_bottom = 432.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Information Column" type="VBoxContainer" parent="Columns"]
+margin_right = 250.0
+margin_bottom = 300.0
+rect_min_size = Vector2( 250, 300 )
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ID Panel" type="PanelContainer" parent="Columns/Information Column"]
+margin_right = 250.0
+margin_bottom = 28.0
+
+[node name="ID Data" type="HBoxContainer" parent="Columns/Information Column/ID Panel"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 21.0
+
+[node name="Current ID" type="Label" parent="Columns/Information Column/ID Panel/ID Data"]
+margin_right = 116.0
+margin_bottom = 14.0
+size_flags_horizontal = 3
+text = "Current ID:"
+
+[node name="ID String" type="Label" parent="Columns/Information Column/ID Panel/ID Data"]
+margin_left = 120.0
+margin_right = 236.0
+margin_bottom = 14.0
+size_flags_horizontal = 3
+text = "1"
+script = ExtResource( 3 )
+
+[node name="ButtonPanel" type="PanelContainer" parent="Columns/Information Column"]
+margin_top = 32.0
+margin_right = 250.0
+margin_bottom = 66.0
+
+[node name="Buttons" type="HBoxContainer" parent="Columns/Information Column/ButtonPanel"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 27.0
+
+[node name="AddPeer" type="Button" parent="Columns/Information Column/ButtonPanel/Buttons"]
+margin_right = 116.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+text = "Add Peer"
+
+[node name="JoinMesh" type="Button" parent="Columns/Information Column/ButtonPanel/Buttons"]
+margin_left = 120.0
+margin_right = 236.0
+margin_bottom = 20.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+text = "Join Mesh"
+
+[node name="Peer ID Key Panel" type="PanelContainer" parent="Columns/Information Column"]
+margin_top = 70.0
+margin_right = 250.0
+margin_bottom = 98.0
+
+[node name="PeerList Key" type="HBoxContainer" parent="Columns/Information Column/Peer ID Key Panel"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 21.0
+
+[node name="Peer ID" type="Label" parent="Columns/Information Column/Peer ID Key Panel/PeerList Key"]
+margin_right = 116.0
+margin_bottom = 14.0
+size_flags_horizontal = 3
+text = "Peer ID"
+
+[node name="Peer Status" type="Label" parent="Columns/Information Column/Peer ID Key Panel/PeerList Key"]
+margin_left = 120.0
+margin_right = 236.0
+margin_bottom = 14.0
+size_flags_horizontal = 3
+text = "Peer Status"
+script = ExtResource( 3 )
+
+[node name="PeerList Panel" type="PanelContainer" parent="Columns/Information Column"]
+margin_top = 102.0
+margin_right = 250.0
+margin_bottom = 300.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Scroll Container" type="ScrollContainer" parent="Columns/Information Column/PeerList Panel"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 191.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="PeerList" type="VBoxContainer" parent="Columns/Information Column/PeerList Panel/Scroll Container"]
+margin_right = 236.0
+margin_bottom = 184.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="IO Column" type="VBoxContainer" parent="Columns"]
+margin_left = 254.0
+margin_right = 504.0
+margin_bottom = 300.0
+rect_min_size = Vector2( 250, 300 )
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Input Field Title" type="PanelContainer" parent="Columns/IO Column"]
+margin_right = 250.0
+margin_bottom = 34.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Columns/IO Column/Input Field Title"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 27.0
+
+[node name="Label" type="Label" parent="Columns/IO Column/Input Field Title/HBoxContainer"]
+margin_top = 3.0
+margin_right = 175.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+text = "Input Field"
+align = 1
+
+[node name="SubmitButton" type="Button" parent="Columns/IO Column/Input Field Title/HBoxContainer"]
+margin_left = 179.0
+margin_right = 236.0
+margin_bottom = 20.0
+text = "Submit"
+
+[node name="Input Field" type="PanelContainer" parent="Columns/IO Column"]
+margin_top = 38.0
+margin_right = 250.0
+margin_bottom = 151.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="TextEdit" type="TextEdit" parent="Columns/IO Column/Input Field"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 106.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Output Field Title" type="PanelContainer" parent="Columns/IO Column"]
+margin_top = 155.0
+margin_right = 250.0
+margin_bottom = 183.0
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="Columns/IO Column/Output Field Title"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 21.0
+size_flags_horizontal = 3
+text = "Output Field"
+align = 1
+
+[node name="Output Field" type="PanelContainer" parent="Columns/IO Column"]
+margin_top = 187.0
+margin_right = 250.0
+margin_bottom = 300.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="TextEdit" type="TextEdit" parent="Columns/IO Column/Output Field"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 243.0
+margin_bottom = 106.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+readonly = true
+wrap_enabled = true
+[connection signal="pressed" from="Columns/Information Column/ButtonPanel/Buttons/AddPeer" to="." method="OnAddPeerButton"]
+[connection signal="pressed" from="Columns/Information Column/ButtonPanel/Buttons/JoinMesh" to="." method="OnJoinMeshButton"]
+[connection signal="pressed" from="Columns/IO Column/Input Field Title/HBoxContainer/SubmitButton" to="." method="OnSubmitButton"]
