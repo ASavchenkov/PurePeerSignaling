@@ -1,18 +1,17 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=2 format=2]
 
-[ext_resource path="res://addons/PurePeerSignaling/scripts/GUI/IDDisplay.cs" type="Script" id=3]
-[ext_resource path="res://addons/PurePeerSignaling/Scripts/GUI/NetworkingMenu.cs" type="Script" id=4]
+[ext_resource path="res://addons/PurePeerSignaling/scripts/GUI/NetworkingMenu.cs" type="Script" id=1]
 
 [node name="Networking" type="CenterContainer"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
-margin_top = 32.0
+margin_top = 31.2063
 margin_right = -4.0
-margin_bottom = -4.0
+margin_bottom = -4.7937
 size_flags_horizontal = 3
 size_flags_vertical = 3
-script = ExtResource( 4 )
+script = ExtResource( 1 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -54,7 +53,6 @@ margin_right = 236.0
 margin_bottom = 14.0
 size_flags_horizontal = 3
 text = "1"
-script = ExtResource( 3 )
 
 [node name="ButtonPanel" type="PanelContainer" parent="Columns/Information Column"]
 margin_top = 32.0
@@ -105,7 +103,6 @@ margin_right = 236.0
 margin_bottom = 14.0
 size_flags_horizontal = 3
 text = "Peer Status"
-script = ExtResource( 3 )
 
 [node name="PeerList Panel" type="PanelContainer" parent="Columns/Information Column"]
 margin_top = 102.0

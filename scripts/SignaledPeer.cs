@@ -43,7 +43,7 @@ public class SignaledPeer : Godot.Object
 
     [Signal]
     public delegate void StatusUpdated(ConnectionStateMachine currentState);
-
+    
     [Signal]
     public delegate void Delete(); 
 
@@ -64,7 +64,16 @@ public class SignaledPeer : Godot.Object
     private SlushNode slushNode;
 
     public enum ConnectionStateMachine { NOMINAL, RELAY, RELAY_SEARCH, MANUAL};
-    public ConnectionStateMachine currentState;
+    
+    private ConnectionStateMachine _CurrentState;
+    public ConnectionStateMachine CurrentState
+    {
+        get{return _CurrentState;}
+        set{
+            _CurrentState = value;
+            EmitSignal(nameof(StatusUpdated),_CurrentState);
+        }
+    }
     System.Timers.Timer pollTimer;
 
     private bool initiator = false;
@@ -111,7 +120,7 @@ public class SignaledPeer : Godot.Object
     {
         UID = _UID;
         this.networking = networking;
-        currentState = startingState;
+        CurrentState = startingState;
         initiator = _initiator;
         pollTimer = _pollTimer;
         pollTimer.Elapsed+= Poll;
@@ -133,12 +142,13 @@ public class SignaledPeer : Godot.Object
         GD.Print("SIGNALED PEER CONSTRUCTOR");
     }
 
+
     public void ResetConnection()
     {
         PeerConnection.Close();
         PeerConnection.Initialize(RTCInitializer);
         LastPing = DateTime.Now;
-        currentState = ConnectionStateMachine.RELAY_SEARCH;
+        CurrentState = ConnectionStateMachine.RELAY_SEARCH;
         GD.Print("RESET CONNECTION");
         Poll();
     }
@@ -165,9 +175,9 @@ public class SignaledPeer : Godot.Object
     public void _OfferCreated(string type, string sdp)
     {
         SetLocalDescription(type,sdp);
-        if(currentState == ConnectionStateMachine.RELAY)
+        if(CurrentState == ConnectionStateMachine.RELAY)
             networking.RpcId(relayUID, "RelayOffer", UID, type, sdp);
-        else if(currentState == ConnectionStateMachine.MANUAL)
+        else if(CurrentState == ConnectionStateMachine.MANUAL)
         {
             GD.Print("manual offer created");
             BufferedOffer = new Offer(networking.RTCMP.GetUniqueId(), UID, type, sdp);
@@ -179,7 +189,7 @@ public class SignaledPeer : Godot.Object
 
     public void _IceCandidateCreated(string media, int index, string name)
     {
-        switch(currentState)
+        switch(CurrentState)
         {
             case ConnectionStateMachine.NOMINAL:
                 networking.RpcId(UID, "AddIceCandidate", networking.GetTree().GetNetworkUniqueId(), media, index, name);
@@ -200,7 +210,7 @@ public class SignaledPeer : Godot.Object
     private void ShuffleRelayCandidates()
     {
         Random r = new Random();
-        IEnumerable<int> filtered = networking.SignaledPeers.Keys.Where(uid => networking.SignaledPeers[uid].currentState == ConnectionStateMachine.NOMINAL);
+        IEnumerable<int> filtered = networking.SignaledPeers.Keys.Where(uid => networking.SignaledPeers[uid].CurrentState == ConnectionStateMachine.NOMINAL);
         relayCandidates = new Queue<int>(filtered.OrderBy(x => x));
         GD.Print("ShuffleRelayCandidates: ", relayCandidates.Count);
     }
@@ -230,9 +240,9 @@ public class SignaledPeer : Godot.Object
 
     public void RelayLost()
     {
-        if(currentState == ConnectionStateMachine.RELAY)
+        if(CurrentState == ConnectionStateMachine.RELAY)
         {
-            currentState = ConnectionStateMachine.RELAY_SEARCH;
+            CurrentState = ConnectionStateMachine.RELAY_SEARCH;
             Poll();
         }
     }
@@ -247,7 +257,7 @@ public class SignaledPeer : Godot.Object
     public void RelayConfirmed(int uid)
     {
         //If someone gets back to us late, we ignore them.
-        if(currentState == ConnectionStateMachine.RELAY_SEARCH)
+        if(CurrentState == ConnectionStateMachine.RELAY_SEARCH)
         {
             
             if(networking.SignaledPeers.ContainsKey(relayUID))
@@ -258,7 +268,7 @@ public class SignaledPeer : Godot.Object
             if(initiator)
                 PeerConnection.CreateOffer();
 
-            currentState = ConnectionStateMachine.RELAY;
+            CurrentState = ConnectionStateMachine.RELAY;
             GD.Print("RELAY CONFIRMED");
             Poll();
         }
@@ -274,7 +284,7 @@ public class SignaledPeer : Godot.Object
     public void Poll()
     {
 
-        if(VOTE_TIME < (DateTime.Now - LastPing) && currentState != ConnectionStateMachine.MANUAL)
+        if(VOTE_TIME < (DateTime.Now - LastPing) && CurrentState != ConnectionStateMachine.MANUAL)
             slushNode.proposal = true;
         else
             slushNode.proposal = false;
@@ -282,6 +292,7 @@ public class SignaledPeer : Godot.Object
         //If enough others have voted to DC this peer, DC immediately.
         //Integer math is fine here, since the threshold is an integer anyways.
         GD.Print("Votes: ", slushNode.consensus, slushNode.confidence0, slushNode.confidence1);
+        
         if(slushNode.consensus && slushNode.confidence1 == 10)
         {
             GD.Print("GOODBYE :(");
@@ -291,7 +302,7 @@ public class SignaledPeer : Godot.Object
         }
 
 
-        switch(currentState)
+        switch(CurrentState)
         {
             case ConnectionStateMachine.NOMINAL:
 
@@ -304,7 +315,7 @@ public class SignaledPeer : Godot.Object
                     buffer = new List<BufferedCandidate>();
                     ShuffleRelayCandidates();
                     EmitSignal("ConnectionLost");
-                    currentState = ConnectionStateMachine.RELAY_SEARCH;
+                    CurrentState = ConnectionStateMachine.RELAY_SEARCH;
                 }
                 break;
             case ConnectionStateMachine.RELAY_SEARCH:
@@ -321,12 +332,12 @@ public class SignaledPeer : Godot.Object
                 break;
         }
 
-        if(networking.RTCMP.HasPeer(UID) && PeerConnection.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected && currentState != ConnectionStateMachine.NOMINAL)
+        if(networking.RTCMP.HasPeer(UID) && PeerConnection.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected && CurrentState != ConnectionStateMachine.NOMINAL)
         {
             if(networking.SignaledPeers.ContainsKey(relayUID))
                 TryDisconnect(networking.SignaledPeers[relayUID], "ConnectionLost", this, "RelayLost");
             LastPing = DateTime.Now;
-            currentState = ConnectionStateMachine.NOMINAL;
+            CurrentState = ConnectionStateMachine.NOMINAL;
             
         }
 

@@ -116,7 +116,7 @@ public class Networking : Node
 	[Remote]
 	public void CheckRelay(int uid)
 	{
-		if (SignaledPeers[uid].currentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
+		if (SignaledPeers[uid].CurrentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
 			RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
 	}
 
@@ -266,7 +266,7 @@ public class Networking : Node
 		foreach( int uid in UnsearchedPeers)
 		{
 			//check if they're connected.
-			if ( SignaledPeers[uid].currentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
+			if ( SignaledPeers[uid].CurrentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
 			{
 				//if they are, then ask them for their peers
 				this.RpcId(uid,"GetPeerUIDs");

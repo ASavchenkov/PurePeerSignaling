@@ -7,6 +7,7 @@ public class NetworkingMenu : CenterContainer
     TextEdit InputField;
     TextEdit OutputField; //This one is read only for the user.
     VBoxContainer PeerList;
+    Label IDLabel;
 
     [Export]
     NodePath networkingPath;
@@ -18,6 +19,7 @@ public class NetworkingMenu : CenterContainer
         InputField = (TextEdit) GetNode("Columns/IO Column/Input Field/TextEdit");
         OutputField = (TextEdit) GetNode("Columns/IO Column/Output Field/TextEdit");
         PeerList =  (VBoxContainer) GetNode("Columns/Information Column/PeerList Panel/Scroll Container/PeerList");
+        IDLabel = (Label) GetNode("Columns/Information Column/ID Panel/ID Data/ID String");
         networking = (Networking) GetNode(networkingPath);
     }
     public void OnPeerAdded(SignaledPeer peer)
@@ -27,7 +29,7 @@ public class NetworkingMenu : CenterContainer
         PeerItem peerItem = (PeerItem) scene.Instance();
         PeerList.AddChild(peerItem);
         peerItem.Init(peer, this);
-        if(peer.currentState == SignaledPeer.ConnectionStateMachine.MANUAL)
+        if(peer.CurrentState == SignaledPeer.ConnectionStateMachine.MANUAL)
             SelectItem(peerItem);
     }
 
@@ -60,7 +62,7 @@ public class NetworkingMenu : CenterContainer
         networking.ManualAddPeer();
     }
 
-    //Only get's pressed if you're entering the response of a peer you've added.
+    //Only gets pressed if you're entering the response of a peer you've added.
     public void OnSubmitButton()
     {
         if(SelectedItem == null)
@@ -70,5 +72,10 @@ public class NetworkingMenu : CenterContainer
         SelectedItem.peer.SetRemoteDescription(offer.type, offer.sdp);
         foreach(SignaledPeer.BufferedCandidate c in offer.ICECandidates)
             SelectedItem.peer.BufferIceCandidate(c.media, c.index, c.name);
+    }
+
+    public void OnMeshJoined(int uid)
+    {
+        IDLabel.Text = uid.ToString("X4");
     }
 }

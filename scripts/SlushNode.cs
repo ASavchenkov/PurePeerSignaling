@@ -87,7 +87,7 @@ public class SlushNode : Node
         //When we start to test this on larger peer counts, we will add subsampling.
         foreach(NodeStatus status in nodes.Values)
         {
-            if(status.peer.currentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
+            if(status.peer.CurrentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
             {
                 voteCount+= status.count(multiplier);
                 totalCount += multiplier + 1;

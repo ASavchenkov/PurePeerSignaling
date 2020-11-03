@@ -25,5 +25,8 @@ __meta__ = {
 }
 
 [node name="Networking" parent="MainMenu/TabContainer" instance=ExtResource( 2 )]
+margin_top = 32.0
+margin_bottom = -4.0
 networkingPath = NodePath("../../../Networking")
+[connection signal="ConnectedToSession" from="Networking" to="Networking" method="OnMeshJoined"]
 [connection signal="PeerAdded" from="Networking" to="MainMenu/TabContainer/Networking" method="OnPeerAdded"]
