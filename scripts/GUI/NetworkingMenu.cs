@@ -10,7 +10,7 @@ public class NetworkingMenu : CenterContainer
     Label IDLabel;
 
     [Export]
-    NodePath networkingPath;
+    String networkingPath = "/root/GameRoot/Networking";
     Networking networking;
     PeerItem SelectedItem = null;
 
@@ -35,7 +35,6 @@ public class NetworkingMenu : CenterContainer
 
     public void SelectItem(PeerItem item)
     {
-
         SelectedItem?.peer.Disconnect(nameof(SignaledPeer.BufferedOfferUpdated),this,nameof(UpdateOutput));
         SelectedItem = item;
         SelectedItem.peer.Connect(nameof(SignaledPeer.BufferedOfferUpdated),this, nameof(UpdateOutput));
