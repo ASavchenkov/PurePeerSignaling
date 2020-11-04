@@ -20,7 +20,10 @@ public class NetworkingMenu : CenterContainer
         OutputField = (TextEdit) GetNode("Columns/IO Column/Output Field/TextEdit");
         PeerList =  (VBoxContainer) GetNode("Columns/Information Column/PeerList Panel/Scroll Container/PeerList");
         IDLabel = (Label) GetNode("Columns/Information Column/ID Panel/ID Data/ID String");
+
         networking = (Networking) GetNode(networkingPath);
+        networking.Connect(nameof(Networking.ConnectedToSession),this, nameof(OnMeshJoined));
+        networking.Connect(nameof(Networking.PeerAdded), this, nameof(OnPeerAdded));
     }
     public void OnPeerAdded(SignaledPeer peer)
     {
