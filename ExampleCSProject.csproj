@@ -59,11 +59,13 @@
     </PackageReference>                       <!-- COPY THIS TO YOUR CSPROJ -->
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Example.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="scripts\HandshakeClient.cs" />
-    <Compile Include="scripts\HandshakeServer.cs" />
-    <Compile Include="scripts\Networking.cs" />
+    <!-- All of these files should automatically get added to your csproj, but if they don't... -->
+    <Compile Include="addons\PurePeerSignaling\Example.cs" />
+    <Compile Include="addons\PurePeerSignaling\Scripts\GUI\NetworkingMenu.cs" />
+    <Compile Include="addons\PurePeerSignaling\scripts\GUI\PeerItem.cs" />
+    <Compile Include="addons\PurePeerSignaling\scripts\Networking.cs" />
+    <Compile Include="addons\PurePeerSignaling\scripts\SignaledPeer.cs" />
+    <Compile Include="addons\PurePeerSignaling\scripts\SlushNode.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
