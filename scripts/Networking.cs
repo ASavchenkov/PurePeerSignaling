@@ -57,11 +57,19 @@ public class Networking : Node
 	public SignaledPeer CreateSignaledPeer(int _UID, SignaledPeer.ConnectionStateMachine startingState, bool _initiator)
     {
 		var peer = new SignaledPeer(_UID, this, startingState, this.PollTimer, _initiator);
-		RTCMP.AddPeer(peer.PeerConnection, _UID);
 		SignaledPeers.Add(_UID, peer);
+		RTCMP.AddPeer(peer.PeerConnection, _UID);
 		
+		peer.Connect(nameof(SignaledPeer.Delete), this, nameof(RemoveSignaledPeer),
+			new Godot.Collections.Array(new object[] {_UID}));
         EmitSignal(nameof(PeerAdded), peer);
 		return peer;
+	}
+
+	public void RemoveSignaledPeer(int UID)
+	{
+		RTCMP.RemovePeer(UID);
+		SignaledPeers.Remove(UID);
 	}
 
 	public void JoinMesh(byte[] packet)

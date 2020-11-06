@@ -137,6 +137,7 @@ public class SignaledPeer : Godot.Object
         slushNode.Name = UID.ToString();
         networking.GetNode("SlushNodes").AddChild(slushNode);
         slushNode.proposal = false;
+        Connect(nameof(Delete),slushNode,"queue_free");
         
         LastPing = DateTime.Now;
         GD.Print("SIGNALED PEER CONSTRUCTOR");
@@ -261,10 +262,10 @@ public class SignaledPeer : Godot.Object
         {
             
             if(networking.SignaledPeers.ContainsKey(relayUID))
-                TryDisconnect(networking.SignaledPeers[relayUID],"ConnectionLost",this, "RelayLost");
+                TryDisconnect(networking.SignaledPeers[relayUID],nameof(ConnectionLost),this, nameof(RelayLost));
             
             relayUID = uid;
-            networking.SignaledPeers[relayUID].Connect("ConnectionLost",this, "RelayLost");
+            networking.SignaledPeers[relayUID].Connect(nameof(ConnectionLost),this, nameof(RelayLost));
             if(initiator)
                 PeerConnection.CreateOffer();
 
@@ -295,10 +296,8 @@ public class SignaledPeer : Godot.Object
         
         if(slushNode.consensus && slushNode.confidence1 == 10)
         {
-            GD.Print("GOODBYE :(");
-            pollTimer.Stop();
-            networking.SignaledPeers.Remove(UID);
-            slushNode.QueueFree();
+            GD.Print("GOODBYE :( ", UID);
+            EmitSignal(nameof(Delete));
         }
 
 
@@ -314,7 +313,7 @@ public class SignaledPeer : Godot.Object
                     localReady = false;
                     buffer = new List<BufferedCandidate>();
                     ShuffleRelayCandidates();
-                    EmitSignal("ConnectionLost");
+                    EmitSignal(nameof(ConnectionLost));
                     CurrentState = ConnectionStateMachine.RELAY_SEARCH;
                 }
                 break;
@@ -326,6 +325,11 @@ public class SignaledPeer : Godot.Object
                 if(relayCandidates.Count!=0)
                 {
                     int nextCandidate = relayCandidates.Dequeue();
+                    if(!networking.SignaledPeers.ContainsKey(nextCandidate)) break;
+                    //No use testing a candidate that _we_ aren't even connected to.
+                    //Realistically can only happen if someone leaves while you're joining
+                    //So should be a very uncommon occurrence.
+
                     GD.Print("NEXT CANDIDATE:", nextCandidate);
                     networking.RpcId(nextCandidate, "CheckRelay", UID);
                 }
@@ -335,7 +339,7 @@ public class SignaledPeer : Godot.Object
         if(networking.RTCMP.HasPeer(UID) && PeerConnection.GetConnectionState() == WebRTCPeerConnection.ConnectionState.Connected && CurrentState != ConnectionStateMachine.NOMINAL)
         {
             if(networking.SignaledPeers.ContainsKey(relayUID))
-                TryDisconnect(networking.SignaledPeers[relayUID], "ConnectionLost", this, "RelayLost");
+                TryDisconnect(networking.SignaledPeers[relayUID], nameof(ConnectionLost), this, nameof(RelayLost));
             LastPing = DateTime.Now;
             CurrentState = ConnectionStateMachine.NOMINAL;
             
@@ -343,22 +347,4 @@ public class SignaledPeer : Godot.Object
 
     }
 
-
-    //We handle all of our own interactions with the RTCMP singleton.
-    ~SignaledPeer()
-    {
-        try{
-            PeerConnection.Close();
-        }catch(Exception e)
-        {
-            GD.Print(e.ToString());
-        }
-        try{
-            slushNode.QueueFree();
-        }catch(Exception e)
-        {
-            GD.Print(e.ToString());
-        }
-        EmitSignal(nameof(Delete));
-    }
 }
