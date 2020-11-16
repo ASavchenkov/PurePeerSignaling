@@ -62,7 +62,7 @@ public class SignaledPeer : Godot.Object
     public static TimeSpan RESET_TIME = new TimeSpan(0,0,6);
     public DateTime LastPing;
     private SlushNode slushNode;
-
+    private System.Timers.Timer PollTimer;
     public enum ConnectionStateMachine { NOMINAL, RELAY, RELAY_SEARCH, MANUAL};
     
     private ConnectionStateMachine _CurrentState;
@@ -74,7 +74,6 @@ public class SignaledPeer : Godot.Object
             EmitSignal(nameof(StatusUpdated),_CurrentState);
         }
     }
-    System.Timers.Timer pollTimer;
 
     private bool initiator = false;
 
@@ -116,19 +115,18 @@ public class SignaledPeer : Godot.Object
 
     //Networking is basically a singleton.
     //(Just poorly implemented).
-    public SignaledPeer(int _UID, Networking networking, ConnectionStateMachine startingState, System.Timers.Timer _pollTimer, bool _initiator)
+    public SignaledPeer(int _UID, Networking networking, ConnectionStateMachine startingState, System.Timers.Timer _PollTimer, bool _initiator)
     {
         UID = _UID;
         this.networking = networking;
         CurrentState = startingState;
         initiator = _initiator;
-        pollTimer = _pollTimer;
-        pollTimer.Elapsed+= Poll;
+        PollTimer = _PollTimer;
+        PollTimer.Elapsed += Poll;
 
         PeerConnection = new WebRTCPeerConnection();
         PeerConnection.Connect("session_description_created", this, "_OfferCreated");
 	    PeerConnection.Connect("ice_candidate_created", this, "_IceCandidateCreated");
-        
         PeerConnection.Initialize(RTCInitializer);
         
         //Setting up the voting mechanism.
@@ -276,6 +274,12 @@ public class SignaledPeer : Godot.Object
         
     }
 
+    public void DeleteSelf()
+    {
+        GD.Print("Goodbye :( ", this.UID);
+        EmitSignal(nameof(Delete));
+        PollTimer.Elapsed-=Poll;
+    }
 
     public void Poll(object source, System.Timers.ElapsedEventArgs e)
     {
@@ -298,6 +302,7 @@ public class SignaledPeer : Godot.Object
         {
             GD.Print("GOODBYE :( ", UID);
             EmitSignal(nameof(Delete));
+            return;
         }
 
 
@@ -325,9 +330,13 @@ public class SignaledPeer : Godot.Object
                 if(relayCandidates.Count!=0)
                 {
                     int nextCandidate = relayCandidates.Dequeue();
-                    if(!networking.SignaledPeers.ContainsKey(nextCandidate)) break;
+                    if(
+                        !networking.SignaledPeers.ContainsKey(nextCandidate) ||
+                        !(networking.SignaledPeers[nextCandidate].CurrentState == ConnectionStateMachine.NOMINAL)
+                    ) break;
                     //No use testing a candidate that _we_ aren't even connected to.
-                    //Realistically can only happen if someone leaves while you're joining
+                    //Realistically can only happen if someone leaves while you're joining,
+                    //or if a peer that's still joining ends up here.
                     //So should be a very uncommon occurrence.
 
                     GD.Print("NEXT CANDIDATE:", nextCandidate);

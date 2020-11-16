@@ -51,25 +51,37 @@ public class Networking : Node
 		PollTimer.AutoReset = true;
 		PollTimer.Start();
 		PollTimer.Elapsed+=LaunchPing;
-
+		RTCMP.Connect("peer_disconnected",this, nameof(OnPeerDC));
 	}
 
-	public SignaledPeer CreateSignaledPeer(int _UID, SignaledPeer.ConnectionStateMachine startingState, bool _initiator)
+	public void OnPeerDC(int uid)
+	{
+		SignaledPeers[uid].DeleteSelf();
+	}
+
+	public SignaledPeer CreateSignaledPeer(int UID, SignaledPeer.ConnectionStateMachine startingState, bool _initiator)
     {
-		var peer = new SignaledPeer(_UID, this, startingState, this.PollTimer, _initiator);
-		SignaledPeers.Add(_UID, peer);
-		RTCMP.AddPeer(peer.PeerConnection, _UID);
-		
+		var peer = new SignaledPeer(UID, this, startingState, PollTimer, _initiator);
+		SignaledPeers.Add(UID, peer);
+		RTCMP.AddPeer(peer.PeerConnection, UID);
+		GD.Print("Connecting Removal of: ", UID);
 		peer.Connect(nameof(SignaledPeer.Delete), this, nameof(RemoveSignaledPeer),
-			new Godot.Collections.Array(new object[] {_UID}));
+			new Godot.Collections.Array(new object[] {UID}));
         EmitSignal(nameof(PeerAdded), peer);
 		return peer;
 	}
 
 	public void RemoveSignaledPeer(int UID)
 	{
-		RTCMP.RemovePeer(UID);
-		SignaledPeers.Remove(UID);
+		//This might get called after RTCMP already
+		//removed the peerconnection of its own accord.
+		GD.Print("removing SignaledPeer: ", UID);
+		if(RTCMP.HasPeer(UID))
+			RTCMP.RemovePeer(UID);
+		if (!SignaledPeers.Remove(UID))
+		{
+			GD.Print(System.Environment.StackTrace);
+		}
 	}
 
 	public void JoinMesh(byte[] packet)
@@ -124,8 +136,10 @@ public class Networking : Node
 	[Remote]
 	public void CheckRelay(int uid)
 	{
-		if (SignaledPeers[uid].CurrentState == SignaledPeer.ConnectionStateMachine.NOMINAL)
-			RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
+		if (
+			SignaledPeers.ContainsKey(uid) &&
+			SignaledPeers[uid].CurrentState == SignaledPeer.ConnectionStateMachine.NOMINAL
+		) RpcId(GetTree().GetRpcSenderId(), "RelayConfirmed", uid);
 	}
 
 	[Remote]
@@ -256,6 +270,7 @@ public class Networking : Node
 
 	public void LaunchPing(object source, System.Timers.ElapsedEventArgs e)
 	{
+		GD.Print("Poll Timer triggered");
 		Rpc("Ping");
 	}
 

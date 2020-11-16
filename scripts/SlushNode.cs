@@ -123,7 +123,7 @@ public class SlushNode : Node
     //Peers that aren't connected to us definitely don't have a vote.
     public void RemovePeer(int uid)
     {
-        GD.Print("Removing Peer");
+        GD.Print("Removing Peer From Voting: ",Name," ",uid);
         if(nodes.ContainsKey(uid))
             nodes.Remove(uid);
     }
