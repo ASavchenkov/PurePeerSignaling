@@ -99,6 +99,7 @@ public class Networking : Node
 		HandshakePeer.Connect(nameof(SignaledPeer.StatusUpdated),this,nameof(HandshakeStatusUpdated));
 		HandshakePeer.PeerConnection.SetRemoteDescription(incomingOffer.type, incomingOffer.sdp);
 
+		EmitSignal(nameof(ConnectedToSession), incomingOffer.assignedUID);
 	}
 	
 	#endregion
