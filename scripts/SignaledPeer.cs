@@ -69,7 +69,8 @@ public class SignaledPeer : Godot.Object
     public ConnectionStateMachine CurrentState
     {
         get{return _CurrentState;}
-        set{
+        set
+        {
             _CurrentState = value;
             EmitSignal(nameof(StatusUpdated),_CurrentState);
         }

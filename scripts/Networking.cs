@@ -16,8 +16,6 @@ Overall mode of operation:
 	We request a list of all peers they're connected to.
 	We call RPCs through them to relay signaling info to these peers
 	We then ask those peers for their peers until we have connected to everyone.
-
-3) We handle reconnects/timeouts in here.
 */
 
 public class Networking : Node
@@ -64,7 +62,7 @@ public class Networking : Node
 		var peer = new SignaledPeer(UID, this, startingState, PollTimer, _initiator);
 		SignaledPeers.Add(UID, peer);
 		RTCMP.AddPeer(peer.PeerConnection, UID);
-		GD.Print("Connecting Removal of: ", UID);
+		
 		peer.Connect(nameof(SignaledPeer.Delete), this, nameof(RemoveSignaledPeer),
 			new Godot.Collections.Array(new object[] {UID}));
         EmitSignal(nameof(PeerAdded), peer);
@@ -78,15 +76,11 @@ public class Networking : Node
 		GD.Print("removing SignaledPeer: ", UID);
 		if(RTCMP.HasPeer(UID))
 			RTCMP.RemovePeer(UID);
-		if (!SignaledPeers.Remove(UID))
-		{
-			GD.Print(System.Environment.StackTrace);
-		}
 	}
 
 	public void JoinMesh(byte[] packet)
 	{
-		GD.Print("_JoinMesh");
+
 		//first you need to remove yourself from the current mesh.
 		RTCMP.Close();
 		SignaledPeers = new Dictionary<int, SignaledPeer>();
@@ -271,7 +265,6 @@ public class Networking : Node
 
 	public void LaunchPing(object source, System.Timers.ElapsedEventArgs e)
 	{
-		GD.Print("Poll Timer triggered");
 		Rpc("Ping");
 	}
 
