@@ -55,7 +55,6 @@ public class SlushNode : Node
     public int confidence0 { get; private set;} = 0; //Confidence counters.
     public int confidence1 { get; private set;} = 0;
     
-    Networking networking;
     System.Timers.Timer pollTimer = new System.Timers.Timer(500);
 
     [Remote]
@@ -65,7 +64,7 @@ public class SlushNode : Node
         int sender = GetTree().GetRpcSenderId();
         if(!nodes.ContainsKey(sender))
         {
-            node = new NodeStatus(networking.SignaledPeers[sender]);
+            node = new NodeStatus(Networking.Instance.SignaledPeers[sender]);
             nodes[sender] = node;
         }
         else
@@ -130,11 +129,10 @@ public class SlushNode : Node
 
     public override void _Ready()
     {
-        networking = (Networking) GetNode("/root/GameRoot/Networking");
         pollTimer.AutoReset = true;
         pollTimer.Start();
         pollTimer.Elapsed+=poll;
-        networking.RTCMP.Connect("peer_disconnected",this, "RemovePeer");
+        Networking.Instance.RTCMP.Connect("peer_disconnected",this, "RemovePeer");
     }
 
 //  // Called every frame. 'delta' is the elapsed time since the previous frame.

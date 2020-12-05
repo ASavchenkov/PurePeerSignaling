@@ -21,6 +21,13 @@ Overall mode of operation:
 public class Networking : Node
 {
 
+	//poor mans singleton.
+	public static Networking Instance
+	{
+		get;
+		private set;
+	}
+
 	[Signal]
 	public delegate void ConnectedToSession(int uid);
 
@@ -42,7 +49,7 @@ public class Networking : Node
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
-		
+		Instance = this;
 		RTCMP.Initialize(1,false);
 		GetTree().NetworkPeer = RTCMP;
 
