@@ -115,7 +115,6 @@ public class SignaledPeer : Godot.Object
     }
 
     //Networking is basically a singleton.
-    //(Just poorly implemented).
     public SignaledPeer(int _UID, Networking networking, ConnectionStateMachine startingState, System.Timers.Timer _PollTimer, bool _initiator)
     {
         UID = _UID;
@@ -147,9 +146,11 @@ public class SignaledPeer : Godot.Object
     {
         PeerConnection.Close();
         PeerConnection.Initialize(RTCInitializer);
-        LastPing = DateTime.Now;
+        remoteReady = false;
+        localReady = false;
+        buffer = new List<BufferedCandidate>();
+        ShuffleRelayCandidates();
         CurrentState = ConnectionStateMachine.RELAY_SEARCH;
-        GD.Print("RESET CONNECTION");
         Poll();
     }
 
@@ -259,11 +260,14 @@ public class SignaledPeer : Godot.Object
         //If someone gets back to us late, we ignore them.
         if(CurrentState == ConnectionStateMachine.RELAY_SEARCH)
         {
-            
+            //Disconnect the previous relay
+            //If it's even still there
             if(networking.SignaledPeers.ContainsKey(relayUID))
                 TryDisconnect(networking.SignaledPeers[relayUID],nameof(ConnectionLost),this, nameof(RelayLost));
             
+            //swap to new relay
             relayUID = uid;
+
             networking.SignaledPeers[relayUID].Connect(nameof(ConnectionLost),this, nameof(RelayLost));
             if(initiator)
                 PeerConnection.CreateOffer();
@@ -301,8 +305,7 @@ public class SignaledPeer : Godot.Object
         
         if(slushNode.consensus && slushNode.confidence1 == 10)
         {
-            GD.Print("GOODBYE :( ", UID);
-            EmitSignal(nameof(Delete));
+            DeleteSelf();
             return;
         }
 
@@ -311,14 +314,10 @@ public class SignaledPeer : Godot.Object
         {
             case ConnectionStateMachine.NOMINAL:
 
-                if(RESET_TIME < (DateTime.Now - LastPing) || PeerConnection.GetConnectionState()==WebRTCPeerConnection.ConnectionState.Closed)
+                if(RESET_TIME < (DateTime.Now - LastPing))
                 {
-                    PeerConnection.Close();
-                    PeerConnection.Initialize(RTCInitializer);
-                    remoteReady = false;
-                    localReady = false;
-                    buffer = new List<BufferedCandidate>();
-                    ShuffleRelayCandidates();
+                    ResetConnection();
+                    GD.Print("emitting CONNECTION LOST");
                     EmitSignal(nameof(ConnectionLost));
                     CurrentState = ConnectionStateMachine.RELAY_SEARCH;
                 }

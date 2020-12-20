@@ -21,12 +21,10 @@ Overall mode of operation:
 public class Networking : Node
 {
 
-	//poor mans singleton.
-	public static Networking Instance
-	{
-		get;
-		private set;
-	}
+	//poor mans singleton
+	//since we can't really control node creation in Godot
+	//AFAIK
+	public static Networking Instance { get; private set;}
 
 	[Signal]
 	public delegate void ConnectedToSession(int uid);
@@ -56,12 +54,7 @@ public class Networking : Node
 		PollTimer.AutoReset = true;
 		PollTimer.Start();
 		PollTimer.Elapsed+=LaunchPing;
-		RTCMP.Connect("peer_disconnected",this, nameof(OnPeerDC));
-	}
-
-	public void OnPeerDC(int uid)
-	{
-		SignaledPeers[uid].DeleteSelf();
+		
 	}
 
 	public SignaledPeer CreateSignaledPeer(int UID, SignaledPeer.ConnectionStateMachine startingState, bool _initiator)
@@ -81,6 +74,7 @@ public class Networking : Node
 		//This might get called after RTCMP already
 		//removed the peerconnection of its own accord.
 		GD.Print("removing SignaledPeer: ", UID);
+		SignaledPeers.Remove(UID);
 		if(RTCMP.HasPeer(UID))
 			RTCMP.RemovePeer(UID);
 	}

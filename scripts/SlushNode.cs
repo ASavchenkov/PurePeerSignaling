@@ -55,7 +55,7 @@ public class SlushNode : Node
     public int confidence0 { get; private set;} = 0; //Confidence counters.
     public int confidence1 { get; private set;} = 0;
     
-    System.Timers.Timer pollTimer = new System.Timers.Timer(500);
+    System.Timers.Timer pollTimer = new System.Timers.Timer(1000);
 
     [Remote]
     private void UpdateNodeStatus(bool proposal, bool consensus)
