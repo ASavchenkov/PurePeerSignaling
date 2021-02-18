@@ -117,6 +117,7 @@ public class SignaledPeer : Godot.Object
     //Networking is basically a singleton.
     public SignaledPeer(int _UID, Networking networking, ConnectionStateMachine startingState, System.Timers.Timer _PollTimer, bool _initiator)
     {
+        
         UID = _UID;
         this.networking = networking;
         CurrentState = startingState;

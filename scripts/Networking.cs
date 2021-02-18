@@ -81,7 +81,7 @@ public class Networking : Node
 
 	public void JoinMesh(byte[] packet)
 	{
-
+		
 		//first you need to remove yourself from the current mesh.
 		RTCMP.Close();
 		SignaledPeers = new Dictionary<int, SignaledPeer>();
