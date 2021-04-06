@@ -10,7 +10,7 @@ public class NetworkingMenu : CenterContainer
     Label IDLabel;
 
     [Export]
-    String networkingPath = "/root/GameRoot/Networking";
+    String networkingPath = "/root/Networking";
     Networking networking;
     PeerItem SelectedItem = null;
 
