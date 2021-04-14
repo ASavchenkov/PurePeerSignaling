@@ -25,3 +25,7 @@
 
 3) Copy the text sent by your invitee into the input field
 4) Click "Submit"
+
+### Working End State
+
+The peer should be listed with a hexadecimal ID, and it's status to the left of it should read "NOMINAL".
