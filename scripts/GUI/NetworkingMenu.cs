@@ -50,7 +50,6 @@ public class NetworkingMenu : CenterContainer
         var offerPacket = MessagePackSerializer.Serialize(offer);
         
         OutputField.Text = MessagePackSerializer.ConvertToJson(offerPacket);
-        //OutputField.Text = System.Text.Encoding.ASCII.GetString(offerPacket);
     }
 
     public void OnJoinMeshButton()
