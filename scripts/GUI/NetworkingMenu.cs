@@ -55,6 +55,7 @@ public class NetworkingMenu : CenterContainer
         var offerPacket = MessagePackSerializer.Serialize(offer);
         OutputField.Text = MessagePackSerializer.ConvertToJson(offerPacket);
         Log.Information("Updated output; {UID}, {L}", offer.assignedUID, OutputField.Text.Length);
+
     }
 
     public void OnJoinMeshButton()
