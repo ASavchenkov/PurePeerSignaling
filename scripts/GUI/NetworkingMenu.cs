@@ -2,6 +2,8 @@ using Godot;
 using System;
 using MessagePack;
 
+using Serilog;
+
 public class NetworkingMenu : CenterContainer
 {
     TextEdit InputField;
@@ -27,13 +29,16 @@ public class NetworkingMenu : CenterContainer
     }
     public void OnPeerAdded(SignaledPeer peer)
     {
-        GD.Print("OnPeerAdded Called");
+
         PackedScene scene = GD.Load<PackedScene>("res://addons/PurePeerSignaling/PeerItem.tscn");
         PeerItem peerItem = (PeerItem) scene.Instance();
         PeerList.AddChild(peerItem);
         peerItem.Init(peer, this);
         if(peer.CurrentState == SignaledPeer.ConnectionStateMachine.MANUAL)
+        {
             SelectItem(peerItem);
+            Log.Information("manual peer selected; {UID}", peer.UID);
+        }
     }
 
     public void SelectItem(PeerItem item)
@@ -46,11 +51,10 @@ public class NetworkingMenu : CenterContainer
     }
     public void UpdateOutput(SignaledPeer.Offer offer)
     {
-        GD.Print(offer.assignedUID);
-        var offerPacket = MessagePackSerializer.Serialize(offer);
         
+        var offerPacket = MessagePackSerializer.Serialize(offer);
         OutputField.Text = MessagePackSerializer.ConvertToJson(offerPacket);
-        //OutputField.Text = System.Text.Encoding.ASCII.GetString(offerPacket);
+        Log.Information("Updated output; {UID}, {L}", offer.assignedUID, OutputField.Text.Length);
     }
 
     public void OnJoinMeshButton()
@@ -73,7 +77,7 @@ public class NetworkingMenu : CenterContainer
         var offer = MessagePackSerializer.Deserialize<SignaledPeer.Offer>(packet);   
         SelectedItem.peer.SetRemoteDescription(offer.type, offer.sdp);
         foreach(SignaledPeer.BufferedCandidate c in offer.ICECandidates)
-            SelectedItem.peer.BufferIceCandidate(c.media, c.index, c.name);
+            SelectedItem.peer.BufferIceCandidate(c);
     }
 
     public void OnMeshJoined(int uid)

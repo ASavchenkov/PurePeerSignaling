@@ -203,6 +203,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 readonly = true
 wrap_enabled = true
+
 [connection signal="pressed" from="Columns/Information Column/ButtonPanel/Buttons/AddPeer" to="." method="OnAddPeerButton"]
 [connection signal="pressed" from="Columns/Information Column/ButtonPanel/Buttons/JoinMesh" to="." method="OnJoinMeshButton"]
 [connection signal="pressed" from="Columns/IO Column/Input Field Title/HBoxContainer/SubmitButton" to="." method="OnSubmitButton"]

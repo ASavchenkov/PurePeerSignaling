@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MessagePack;
+
+using Serilog;
 /*
 TL;DR Poor Mans Polymorphism
 
@@ -139,7 +141,8 @@ public class SignaledPeer : Godot.Object
         Connect(nameof(Delete),slushNode,"queue_free");
         
         LastPing = DateTime.Now;
-        GD.Print("SIGNALED PEER CONSTRUCTOR");
+        Log.Information("SignaledPeer {UID} created.", UID);
+        
     }
 
 
@@ -161,16 +164,20 @@ public class SignaledPeer : Godot.Object
         localReady = true;
         if(ReadyForIce())
             ReleaseBuffer();
-        GD.Print("SET LOCAL DESCRIPTION");
+        GD.Print("SET LOCAL DESCRIPTION: ", PeerConnection.GetConnectionState());
+        
         Poll();
     }
     public void SetRemoteDescription(string type, string sdp)
     {
+        GD.Print("SET REMOTE DESCRIPTION: ", type);
+        GD.Print("CURRENT STATE: ", PeerConnection.GetConnectionState());
         PeerConnection.SetRemoteDescription(type, sdp);
         remoteReady = true;
         if(ReadyForIce())
             ReleaseBuffer();
-        GD.Print("SET REMOTE DESCRIPTION");
+            
+        GD.Print("STATE AFTER SET_REMOTE: ", PeerConnection.GetConnectionState());
         Poll();
     }
 
@@ -181,12 +188,11 @@ public class SignaledPeer : Godot.Object
             networking.RpcId(relayUID, "RelayOffer", UID, type, sdp);
         else if(CurrentState == ConnectionStateMachine.MANUAL)
         {
-            GD.Print("manual offer created");
             BufferedOffer = new Offer(networking.RTCMP.GetUniqueId(), UID, type, sdp);
             EmitSignal(nameof(BufferedOfferUpdated), BufferedOffer);
         }
 
-        GD.Print("OFFER CREATED: ", type); 
+        Log.Information("SignaledPeer {UID} Offer Created; type: {type}", UID, type);
     }
 
     public void _IceCandidateCreated(string media, int index, string name)
@@ -225,17 +231,22 @@ public class SignaledPeer : Godot.Object
 
     public void ReleaseBuffer()
     {
-        foreach( BufferedCandidate candidate in buffer)
-		    PeerConnection.AddIceCandidate(candidate.media, candidate.index, candidate.name);
+        foreach( BufferedCandidate c in buffer)
+		    PeerConnection.AddIceCandidate(c.media, c.index, c.name);
         Poll();
     }
-    //Automaticall skips buffering if ready for ice
-    public void BufferIceCandidate(string media, int index, string name)
+    //Automatically skips buffering if ready for ice
+    public void BufferIceCandidate( string media, int index, string name)
+    {
+        BufferIceCandidate(new BufferedCandidate(media, index, name));
+    }
+
+    public void BufferIceCandidate(BufferedCandidate c)
     {
         if(ReadyForIce())
-            PeerConnection.AddIceCandidate(media,index, name);
+            PeerConnection.AddIceCandidate(c.media,c.index, c.name);
         else
-            buffer.Add(new BufferedCandidate{media = media, index = index, name = name});
+            buffer.Add(c);
         Poll();
     }
     #endregion

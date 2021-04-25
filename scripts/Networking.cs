@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using MessagePack;
+using Serilog;
 
 /*
 Overall mode of operation:
@@ -20,7 +21,7 @@ Overall mode of operation:
 
 public class Networking : Node
 {
-
+	
 	//poor mans singleton
 	//since we can't really control node creation in Godot
 	//AFAIK
@@ -47,6 +48,9 @@ public class Networking : Node
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
+
+		Log.Logger = new LoggerConfiguration().WriteTo.File("logs/PPS.txt", buffered: false).CreateLogger();
+
 		Instance = this;
 		RTCMP.Initialize(1,false);
 		GetTree().NetworkPeer = RTCMP;
@@ -60,6 +64,7 @@ public class Networking : Node
 	public SignaledPeer CreateSignaledPeer(int UID, SignaledPeer.ConnectionStateMachine startingState, bool _initiator)
     {
 		var peer = new SignaledPeer(UID, this, startingState, PollTimer, _initiator);
+		Log.Information("New Peer: {UID} state: {S}", peer.UID, startingState);
 		SignaledPeers.Add(UID, peer);
 		RTCMP.AddPeer(peer.PeerConnection, UID);
 		
@@ -73,7 +78,8 @@ public class Networking : Node
 	{
 		//This might get called after RTCMP already
 		//removed the peerconnection of its own accord.
-		GD.Print("removing SignaledPeer: ", UID);
+		Log.Information("Removing SignaledPeer {UID} PeerConnStatus: {Has}", UID, RTCMP.HasPeer(UID));
+
 		SignaledPeers.Remove(UID);
 		if(RTCMP.HasPeer(UID))
 			RTCMP.RemovePeer(UID);
@@ -93,6 +99,11 @@ public class Networking : Node
 		HandshakePeer = CreateSignaledPeer(incomingOffer.UID, SignaledPeer.ConnectionStateMachine.MANUAL, false);
 		HandshakePeer.Connect(nameof(SignaledPeer.StatusUpdated),this,nameof(HandshakeStatusUpdated));
 		HandshakePeer.PeerConnection.SetRemoteDescription(incomingOffer.type, incomingOffer.sdp);
+		
+		foreach (SignaledPeer.BufferedCandidate c in incomingOffer.ICECandidates)
+		{
+			HandshakePeer.BufferIceCandidate(c);
+		}
 
 		EmitSignal(nameof(ConnectedToSession), incomingOffer.assignedUID);
 	}
@@ -154,7 +165,7 @@ public class Networking : Node
 	[Remote]
 	public void ReceiveOffer(int uid, string type, string sdp)
 	{
-		GD.Print("RECEIVE OFFER: ", type);
+		Log.Information("Relayed offer received of type {type}", type);
 
 		SignaledPeer peer;
 		
@@ -253,6 +264,7 @@ public class Networking : Node
 	//Start the discovery process.
 	public void HandshakeStatusUpdated(SignaledPeer.ConnectionStateMachine state)
 	{
+		Log.Information("Handshake Status Updated to {status}", state);
 		if(state == SignaledPeer.ConnectionStateMachine.NOMINAL)
 		{
 			this.RpcId(HandshakePeer.UID, nameof(GetPeerUIDs));
