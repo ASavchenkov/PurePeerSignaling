@@ -313,7 +313,7 @@ public class SignaledPeer : Godot.Object
 
         //If enough others have voted to DC this peer, DC immediately.
         //Integer math is fine here, since the threshold is an integer anyways.
-        GD.Print(slushNode.Name, " Votes: ", slushNode.consensus, slushNode.confidence0, " ", slushNode.confidence1);
+        // GD.Print(slushNode.Name, " Votes: ", slushNode.consensus, slushNode.confidence0, " ", slushNode.confidence1);
         
         if(slushNode.consensus && slushNode.confidence1 == 10)
         {
