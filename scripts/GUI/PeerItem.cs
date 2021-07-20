@@ -20,7 +20,7 @@ public class PeerItem : HBoxContainer
         peer.Connect(nameof(SignaledPeer.StatusUpdated),this, nameof(OnStatusChanged));
         OnStatusChanged(peer.CurrentState);
         clickableName.Connect("pressed", menu, nameof(NetworkingMenu.SelectItem),
-            new Godot.Collections.Array(new object[] {this}));
+            new Godot.Collections.Array {this});
         peer.Connect(nameof(SignaledPeer.Delete),this,"queue_free");
     }
 

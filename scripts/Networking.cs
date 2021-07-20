@@ -69,7 +69,7 @@ public class Networking : Node
 		RTCMP.AddPeer(peer.PeerConnection, UID);
 		
 		peer.Connect(nameof(SignaledPeer.Delete), this, nameof(RemoveSignaledPeer),
-			new Godot.Collections.Array(new object[] {UID}));
+			new Godot.Collections.Array {UID});
         EmitSignal(nameof(PeerAdded), peer);
 		return peer;
 	}
