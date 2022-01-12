@@ -11,8 +11,6 @@ public class NetworkingMenu : CenterContainer
     VBoxContainer PeerList;
     Label IDLabel;
 
-    [Export]
-    String networkingPath = "/root/Networking";
     Networking networking;
     PeerItem SelectedItem = null;
 
@@ -23,7 +21,7 @@ public class NetworkingMenu : CenterContainer
         PeerList =  (VBoxContainer) GetNode("Columns/Information Column/PeerList Panel/Scroll Container/PeerList");
         IDLabel = (Label) GetNode("Columns/Information Column/ID Panel/ID Data/ID String");
 
-        networking = (Networking) GetNode(networkingPath);
+        networking = Networking.Instance();
         networking.Connect(nameof(Networking.ConnectedToSession),this, nameof(OnMeshJoined));
         networking.Connect(nameof(Networking.PeerAdded), this, nameof(OnPeerAdded));
     }
