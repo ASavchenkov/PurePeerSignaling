@@ -21,7 +21,7 @@ public class NetworkingMenu : CenterContainer
         PeerList =  (VBoxContainer) GetNode("Columns/Information Column/PeerList Panel/Scroll Container/PeerList");
         IDLabel = (Label) GetNode("Columns/Information Column/ID Panel/ID Data/ID String");
 
-        networking = Networking.Instance();
+        networking = Networking.Instance;
         networking.Connect(nameof(Networking.ConnectedToSession),this, nameof(OnMeshJoined));
         networking.Connect(nameof(Networking.PeerAdded), this, nameof(OnPeerAdded));
     }
